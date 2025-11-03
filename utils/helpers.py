@@ -7,8 +7,19 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, 
 from config import (
     client, files_collection, users_collection, LOG_CHANNEL, BASE_URL, 
     DELETE_AFTER_FILE, DELETE_AFTER, DELETE_DELAY_REQ, INDEX_CHANNEL, 
-    AUTH_CHANNEL, GROUP_ID,MINI_APP_URL
+    AUTH_CHANNELS, GROUP_ID,MINI_APP_URL
 )
+
+
+
+# ✅ Startup preloader (manual)
+async def preload_chats():
+    for chat_id in AUTH_CHANNELS + [INDEX_CHANNEL]:
+        try:
+            chat = await client.get_chat(chat_id)
+            print(f"[READY] Loaded chat peer: {chat.title} ({chat_id})")
+        except Exception as e:
+            print(f"[WARN] Could not preload {chat_id}: {e}")
 
 # ------------------ User Utilities ------------------ #
 
@@ -141,50 +152,113 @@ def build_index_page(files, page):
 
 # ------------------ Subscription ------------------ #
 
-async def is_subscribed(user_id):
-    try:
-        member = await client.get_chat_member(AUTH_CHANNEL, user_id)
-        return member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.OWNER, enums.ChatMemberStatus.ADMINISTRATOR]
-    except:
-        return False
 
+async def get_not_joined_channels(user_id: int):
+    """Return list of channel/group IDs the user hasn't joined yet."""
+    not_joined = []
+    for channel_id in AUTH_CHANNELS:
+        try:
+            member = await client.get_chat_member(channel_id, user_id)
+            if member.status not in (
+                enums.ChatMemberStatus.MEMBER,
+                enums.ChatMemberStatus.ADMINISTRATOR,
+                enums.ChatMemberStatus.OWNER,
+            ):
+                not_joined.append(channel_id)
+        except Exception as e:
+            # Only add to not_joined, no warning printed for normal "not a member" cases
+            err_msg = str(e).lower()
+            if "user_not_participant" in err_msg or "user not found" in err_msg:
+                # normal, user just not joined
+                not_joined.append(channel_id)
+            elif "peer id invalid" in err_msg:
+                # Bot not in that chat
+                print(f"[INFO] Skipping inaccessible chat {channel_id} (bot not member)")
+            else:
+                # unexpected errors only
+                print(f"[ERROR] get_not_joined_channels(): {e}")
+                not_joined.append(channel_id)
+    return not_joined
 
 async def check_sub_and_send_file(c: Client, m: Message, msg_id: int):
-    if not await is_subscribed(m.from_user.id):
-        try:
-            invite_link = await c.export_chat_invite_link(AUTH_CHANNEL)
-        except Exception:
-            invite_link = "https://t.me/+CyoimDCsFuIzNDQ1"
+    """Check all subscriptions and send file if user joined all groups/channels."""
+    not_joined = await get_not_joined_channels(m.from_user.id)
+
+    if not_joined:
+        join_buttons = []
+
+        # Build all join buttons first
+        all_buttons = []
+        for chat_id in not_joined:
+            chat_title = f"Chat {chat_id}"  # default title
+            invite_link = "https://t.me"    # default fallback
+
+            try:
+                chat = await c.get_chat(chat_id)
+                chat_title = chat.title or "Group/Channel"
+
+                if chat.username:
+                    invite_link = f"https://t.me/{chat.username}"
+                else:
+                    try:
+                        invite_link = await c.export_chat_invite_link(chat_id)
+                    except Exception as e:
+                        print(f"[WARN] Cannot export invite link for {chat_id}: {e}")
+            except Exception as e:
+                print(f"[ERROR] Failed to process {chat_id}: {e}")
+
+            all_buttons.append(InlineKeyboardButton(f"Join: {chat_title}", url=invite_link))
+
+        # Group buttons 2 per row
+        for i in range(0, len(all_buttons), 2):
+            join_buttons.append(all_buttons[i:i+2])
+
+        # Add "I Joined" button at the end
+        join_buttons.append([
+            InlineKeyboardButton("✅ I Joined", callback_data=f"retry_{msg_id}")
+        ])
 
         return await m.reply_text(
-            "<b>🚫 You must join our Updates Channel to access this file.</b>",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔔 Join Channel", url=invite_link)],
-                [InlineKeyboardButton("✅ I Joined", callback_data=f"retry_{msg_id}")]
-            ]),
+            "<b>🚫 You must join all our channels/groups to access this file.</b>\n\n"
+            "<b>Remaining:</b>",
+            reply_markup=InlineKeyboardMarkup(join_buttons),
             parse_mode=enums.ParseMode.HTML
         )
 
+    # ✅ User joined all channels/groups
     try:
-        sent = await c.copy_message(chat_id=m.chat.id, from_chat_id=INDEX_CHANNEL, message_id=msg_id)
+        sent = await c.copy_message(
+            chat_id=m.chat.id, from_chat_id=INDEX_CHANNEL, message_id=msg_id
+        )
+
         warning = await m.reply(
             f"<b><u>❗️❗️❗️ IMPORTANT ❗️❗️❗️</u></b>\n\n"
-            f"ᴛʜɪs ᴍᴇssᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪɴ <b><u>{DELETE_AFTER//60}</u> ᴍɪɴᴜᴛᴇs</b> 🫥 (ᴅᴜᴇ ᴛᴏ ᴄᴏᴘʏʀɪɢʜᴛ ɪssᴜᴇs).\n\n"
+            f"ᴛʜɪs ᴍᴇssᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪɴ <b><u>{DELETE_AFTER_FILE//60}</u> ᴍɪɴᴜᴛᴇs</b> 🫥 "
+            "(ᴅᴜᴇ ᴛᴏ ᴄᴏᴘʏʀɪɢʜᴛ ɪssᴜᴇs).\n\n"
             "<b>📌 Please forward this message to your Saved Messages or any private chat to avoid losing it.</b>",
-            parse_mode=enums.ParseMode.HTML
+            parse_mode=enums.ParseMode.HTML,
         )
+
         await asyncio.sleep(DELETE_AFTER_FILE)
         await sent.delete()
+
         await warning.edit_text(
-            "<b>ʏᴏᴜʀ ᴍᴇssᴀɢᴇ ɪs sᴜᴄᴄᴇssғᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ.</b>\n"
-            "<b>ɪғ ʏᴏᴜ ᴡᴀɴᴛ ᴛʜɪs ᴍᴇssᴀɢᴇ ᴀɢᴀɪɴ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴏɴ ʙᴇʟᴏᴡ ʙᴜᴛᴛᴏɴ</b>",
+            "<b>✅ Your message has been successfully deleted.</b>\n"
+            "<b>If you want it again, click below:</b>",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("📥 Get Message Again", url=f"{BASE_URL}/redirect?id={msg_id}")]
             ]),
             parse_mode=enums.ParseMode.HTML
         )
+
     except Exception as e:
-        await m.reply(f"❌ Error:\n<code>{e}</code>", parse_mode=enums.ParseMode.HTML)
+        await m.reply(
+            f"❌ Error while sending file:\n<code>{e}</code>",
+            parse_mode=enums.ParseMode.HTML,
+        )
+
+
+
 
 
 # ------------------ Pagination ------------------ #
