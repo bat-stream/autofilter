@@ -17,7 +17,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 LOG_CHANNEL = int(os.getenv("LOG_CHANNEL"))
 UPDATES_CHANNEL = os.getenv("UPDATES_CHANNEL")
 MOVIES_GROUP = os.getenv("MOVIES_GROUP")
-AUTH_CHANNEL = int(os.getenv("AUTH_CHANNEL"))
+AUTH_CHANNELS = [int(ch.strip()) for ch in os.getenv("AUTH_CHANNELS", "").split(",") if ch.strip()]
 
 DELETE_AFTER = int(os.getenv("DELETE_AFTER", 1800))
 DELETE_AFTER_FILE = int(os.getenv("DELETE_AFTER_FILE", 1800))
@@ -36,3 +36,4 @@ users_collection = db["users"]
 pending_requests = db["pending_requests"]
 
 PAGE_SIZE = 6
+
