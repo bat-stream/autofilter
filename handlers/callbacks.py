@@ -1,8 +1,9 @@
 from pyrogram import Client, filters, enums
 from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from config import client, files_collection, INDEX_CHANNEL, BASE_URL, DELETE_AFTER, DELETE_AFTER_FILE, AUTH_CHANNEL,UPDATES_CHANNEL, MOVIES_GROUP,BOT_USERNAME
-from utils.helpers import save_user,get_file_buttons,build_index_page,is_subscribed,delete_after_delay,check_sub_and_send_file,build_custom_caption,send_paginated_files,send_file_with_caption
+from config import client, files_collection, INDEX_CHANNEL, BASE_URL, DELETE_AFTER, DELETE_AFTER_FILE, AUTH_CHANNELS,UPDATES_CHANNEL, MOVIES_GROUP,BOT_USERNAME
+from utils.helpers import save_user,get_file_buttons,build_index_page,get_not_joined_channels,delete_after_delay,check_sub_and_send_file,build_custom_caption,send_paginated_files,send_file_with_caption
 import asyncio, re
+from pyrogram.errors import MessageNotModified
 import urllib.parse
 import math
 
@@ -63,14 +64,47 @@ async def paginate_index(c: Client, cb: CallbackQuery):
         await cb.answer("⚠️ Couldn't update.", show_alert=True)
 
 
-@client.on_callback_query(filters.regex("retry_"))
+
+@client.on_callback_query(filters.regex(r"^retry_"))
 async def retry_after_join(c: Client, cb: CallbackQuery):
     msg_id = int(cb.data.split("_")[1])
-    if await is_subscribed(cb.from_user.id):
+
+    not_joined = await get_not_joined_channels(cb.from_user.id)
+
+    if not not_joined:
+        # ✅ Joined all channels — send file
         await cb.message.delete()
         await check_sub_and_send_file(c, cb.message, msg_id)
-    else:
-        await cb.answer("❌ You're still not subscribed!", show_alert=True)
+        return
+
+    # ❌ Still missing some channels
+    join_buttons = []
+    for channel_id in not_joined:
+        try:
+            chat = await c.get_chat(channel_id)
+            chat_title = chat.title
+            if chat.username:
+                invite_link = f"https://t.me/{chat.username}"
+            else:
+                invite_link = await c.export_chat_invite_link(channel_id)
+        except Exception:
+            chat_title = "Channel"
+            invite_link = "https://t.me/yourfallbackchannel"
+
+        join_buttons.append([InlineKeyboardButton(f"🔔 Join {chat_title}", url=invite_link)])
+
+    join_buttons.append([InlineKeyboardButton("✅ I Joined", callback_data=f"retry_{msg_id}")])
+
+    try:
+        await cb.message.edit_text(
+            "<b>❌ You're still missing some channels!</b>\n\n"
+            "<b>Please join all remaining channels below:</b>",
+            reply_markup=InlineKeyboardMarkup(join_buttons),
+            parse_mode=enums.ParseMode.HTML
+        )
+    except MessageNotModified:
+        # Ignore harmless "message not modified" errors
+        await cb.answer("⚠️ Please join all remaining channels first!", show_alert=True)
 
 # ---------------- Help callback ----------------
 @client.on_callback_query(filters.regex("help_info"))
