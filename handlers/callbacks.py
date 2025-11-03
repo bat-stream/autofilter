@@ -1,6 +1,6 @@
 from pyrogram import Client, filters, enums
-from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from config import client, files_collection, INDEX_CHANNEL, BASE_URL, DELETE_AFTER, DELETE_AFTER_FILE, AUTH_CHANNELS,UPDATES_CHANNEL, MOVIES_GROUP,BOT_USERNAME
+from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton,WebAppInfo
+from config import client, files_collection, INDEX_CHANNEL, BASE_URL,MINI_APP_URL, DELETE_AFTER, DELETE_AFTER_FILE, AUTH_CHANNELS,UPDATES_CHANNEL, MOVIES_GROUP,BOT_USERNAME
 from utils.helpers import save_user,get_file_buttons,build_index_page,get_not_joined_channels,delete_after_delay,check_sub_and_send_file,build_custom_caption,send_paginated_files,send_file_with_caption
 import asyncio, re
 from pyrogram.errors import MessageNotModified
@@ -110,11 +110,11 @@ async def retry_after_join(c: Client, cb: CallbackQuery):
 @client.on_callback_query(filters.regex("help_info"))
 async def help_callback(_, cb: CallbackQuery):
     await cb.message.edit_text(
-        "<b>How to use me?</b>\n\n"
-        "🔹 Just type any movie or file name.\n"
-        "🔹 I’ll show you the available links.\n"
-        "🔹 Click the one you want, and I’ll send it to you!\n\n"
-        "🎥 For latest movies, join @Batmanlinkz",
+        "<b>Hᴏᴡ ᴛᴏ Usᴇ Mᴇ?</b>\n\n"
+        "<b>🔹 Jᴜsᴛ Sᴇɴᴅ ᴀɴʏ Mᴏᴠɪᴇ Nᴀᴍᴇ.</b>\n"
+        "<b>🔹 I’ʟʟ Sʜᴏᴡ ʏᴏᴜ ᴛʜᴇ Aᴠᴀɪʟᴀʙʟᴇ Lɪɴᴋs ᴡɪᴛʜ Sɪᴢᴇs.</b>\n"
+        "<b>🔹 Cʟɪᴄᴋ ᴛʜᴇ Oɴᴇ ʏᴏᴜ Wᴀɴᴛ, ᴀɴᴅ I’ʟʟ Sᴇɴᴅ ɪᴛ ᴛᴏ Yᴏᴜ!</b>\n\n"
+        "<b>🎥 Fᴏʀ Lᴀᴛᴇsᴛ Mᴏᴠɪᴇs, Jᴏɪɴ @Batmanlinkz</b>",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 Back", callback_data="start_back")]
         ]),
@@ -136,16 +136,17 @@ async def back_to_start(_, cb: CallbackQuery):
 
     start_text = (
         f"😎 ʜᴇʏ {user_name},\n\n"
-        "ɪ ᴀᴍ ᴀ ғɪʟᴛᴇʀ ʙᴏᴛ...\n\n"
+        "ɪ ᴀᴍ Bᴀᴛᴍᴀɴ\n\n"
         "ғᴏʀ ɴᴇᴡ ᴍᴏᴠɪᴇs ᴊᴏɪɴ ʜᴇʀᴇ @Batmanlinkz\n\n"
+        "Tᴏ Bʀᴏᴡsᴇ Sᴛᴏʀᴇᴅ Fɪʟᴇs Cʟɪᴄᴋ ᴏɴ Oᴘᴇɴ Mɪɴɪ Aᴘᴘ\n\n"
         "ᴛᴏ ᴋɴᴏᴡ ᴍᴏʀᴇ ᴄʟɪᴄᴋ ʜᴇʟᴘ ʙᴜᴛᴛᴏɴ."
     )
 
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ Add Me To Group", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
-        [InlineKeyboardButton("📢 Updates Channel", url=UPDATES_CHANNEL),
-         InlineKeyboardButton("Help❓", callback_data="help_info")],
-        [InlineKeyboardButton("🎬 Movie Group", url=MOVIES_GROUP)]
+        [ InlineKeyboardButton("🚀 Oᴘᴇɴ Mɪɴɪ Aᴘᴘ", web_app=WebAppInfo(url=MINI_APP_URL)) ],
+            [ InlineKeyboardButton("📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ", url=UPDATES_CHANNEL),
+              InlineKeyboardButton("Hᴇʟᴘ❓", callback_data="help_info") ],
+            [ InlineKeyboardButton("🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ", url=MOVIES_GROUP) ]
     ])
 
     await msg.edit_text(
