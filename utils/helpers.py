@@ -12,15 +12,6 @@ from config import (
 
 
 
-# ✅ Startup preloader (manual)
-async def preload_chats():
-    for chat_id in AUTH_CHANNELS + [INDEX_CHANNEL]:
-        try:
-            chat = await client.get_chat(chat_id)
-            print(f"[READY] Loaded chat peer: {chat.title} ({chat_id})")
-        except Exception as e:
-            print(f"[WARN] Could not preload {chat_id}: {e}")
-
 # ------------------ User Utilities ------------------ #
 
 async def save_user(user_id):
@@ -122,7 +113,7 @@ def build_index_page(files, page):
     end = start + PAGE_SIZE
     current = files[start:end]
 
-    lines = ["📄 <b>Stored Files:</b>\n"]
+    lines = ["📄 <b>Sᴛᴏʀᴇᴅ Fɪʟᴇs:</b>\n"]
     for i, f in enumerate(current, start=start + 1):
         file_size = f.get("file_size") or 0
         size_mb = round(file_size / (1024 * 1024), 2)
@@ -133,13 +124,13 @@ def build_index_page(files, page):
 
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⏮️ First", callback_data="indexpage_0"))
-        nav_buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"indexpage_{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton("⏮️ Fɪʀsᴛ", callback_data="indexpage_0"))
+        nav_buttons.append(InlineKeyboardButton("⬅️ Pʀᴇᴠ", callback_data=f"indexpage_{page - 1}"))
     if page < total_pages - 1:
-        nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"indexpage_{page + 1}"))
-        nav_buttons.append(InlineKeyboardButton("⏭️ Last", callback_data=f"indexpage_{total_pages - 1}"))
+        nav_buttons.append(InlineKeyboardButton("Nᴇxᴛ ➡️", callback_data=f"indexpage_{page + 1}"))
+        nav_buttons.append(InlineKeyboardButton("⏭️ Lᴀsᴛ", callback_data=f"indexpage_{total_pages - 1}"))
 
-    close_button = [InlineKeyboardButton("❌ Close", callback_data="close_index")]
+    close_button = [InlineKeyboardButton("❌ Cʟᴏsᴇ", callback_data="close_index")]
 
     keyboard = []
     if nav_buttons:
@@ -265,11 +256,19 @@ async def check_sub_and_send_file(c: Client, m: Message, msg_id: int):
 
 ITEMS_PER_PAGE = 6
 
-async def send_paginated_files(c: Client, user_id, files, page, filename_query, query: CallbackQuery = None):
+async def send_paginated_files(
+    c: Client,
+    user_id: int,
+    files: list,
+    page: int,
+    filename_query: str,
+    query: CallbackQuery = None
+):
+    """Send paginated files to user/group with improved messages and dynamic filename display."""
     user = await c.get_users(user_id)
     full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
 
-    # Pagination calculation
+    # Pagination logic
     total_pages = (len(files) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
     page = max(0, min(page, total_pages - 1))
     start = page * ITEMS_PER_PAGE
@@ -277,14 +276,22 @@ async def send_paginated_files(c: Client, user_id, files, page, filename_query, 
     current_files = files[start:end]
 
     mention = f"<a href='tg://user?id={user_id}'>{full_name}</a>"
-    text = f"<b>👋 Hey {mention}, Your Requested Files Have Been Added By Admin</b> (Page {page + 1}/{total_pages}):\n\n"
+    text = (
+        f"<b>👋 Hey {mention},</b>\n\n"
+        f"<b>Your requested file(s) for:</b> <code>{filename_query}</code>\n"
+        f"<b>have been added and sent to the group ✅</b>\n\n"
+        f"<b>📄 Page:</b> {page + 1}/{total_pages}\n\n"
+    )
 
     for i, file_doc in enumerate(current_files, start=1):
         file_name = file_doc["file_name"]
         file_size = round(file_doc.get("file_size", 0) / (1024 * 1024), 2)
         msg_id = file_doc["message_id"]
-        text += f"➤ <b>{file_name}</b> — {file_size} MB\n"
-        text += f"    <a href='{BASE_URL}/redirect?id={msg_id}'>📥 Download</a>\n\n"
+
+        text += (
+            f"➤ <b>{file_name}</b> — <code>{file_size} MB</code>\n"
+            f"    <a href='{BASE_URL}/redirect?id={msg_id}'>📥 Get File</a>\n\n"
+        )
 
     # Navigation buttons
     buttons = []
@@ -299,10 +306,12 @@ async def send_paginated_files(c: Client, user_id, files, page, filename_query, 
         )
     if nav_buttons:
         buttons.append(nav_buttons)
+
     markup = InlineKeyboardMarkup(buttons) if buttons else None
 
-    # Send or edit message
+    # Edit or send message
     if query:
+        # When using inline callback for navigation
         await query.edit_message_text(
             text,
             reply_markup=markup,
@@ -311,6 +320,7 @@ async def send_paginated_files(c: Client, user_id, files, page, filename_query, 
         )
         msg = query.message
     else:
+        # Initial message — send to group
         msg = await c.send_message(
             GROUP_ID,
             text,
@@ -319,18 +329,21 @@ async def send_paginated_files(c: Client, user_id, files, page, filename_query, 
             disable_web_page_preview=True
         )
 
-        # ✅ Send PM only on first send, not on pagination
+        # Notify the user privately (optional)
         pm_text = (
-            "✅ Your requested files have been sent to the group.\n\n"
-            "<a href='https://t.me/+Dzcz5yk-ayFjODZl'>Click Here</a>"
+            f"<b>✅ Yᴏᴜʀ ʀᴇᴏ̨ᴜᴇsᴛᴇᴅ ғɪʟᴇs ғᴏʀ <code>{filename_query}</code></b> "
+            f"<b>ʜᴀᴠᴇ ʙᴇᴇɴ sᴜᴄᴄᴇssғᴜʟʟʏ ᴀᴅᴅᴇᴅ ᴀɴᴅ sᴇɴᴛ ᴛᴏ ᴛʜᴇ ɢʀᴏᴜᴘ.</b>\n\n"
+            f"<b><a href='https://t.me/+Dzcz5yk-ayFjODZl'>Cʟɪᴄᴋ Hᴇʀᴇ ᴛᴏ Vɪᴇᴡ</a></b>"
         )
+
         try:
-            await c.send_message(user_id, pm_text)
+            await c.send_message(user_id, pm_text, parse_mode=enums.ParseMode.HTML)
         except Exception:
             pass
 
-    # Auto-delete after delay
+    # Schedule message deletion
     asyncio.create_task(delete_after_delay(msg, DELETE_DELAY_REQ))
+
 
 
 
@@ -367,14 +380,13 @@ def get_file_buttons(files, query, page):
     # ✅ Navigation buttons
     nav = []
     if page > 0:  # not first page
-        nav.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"page_{encoded_query}_{page - 1}"))
+        nav.append(InlineKeyboardButton("⬅️ Pʀᴇᴠ", callback_data=f"page_{encoded_query}_{page - 1}"))
 
     if (page + 1) * PAGE_SIZE < total_files:  # next page exists
-        nav.append(InlineKeyboardButton("Next ➡️", callback_data=f"page_{encoded_query}_{page + 1}"))
+        nav.append(InlineKeyboardButton("Nᴇxᴛ ➡️", callback_data=f"page_{encoded_query}_{page + 1}"))
 
     if nav:
         buttons.append(nav)
 
     return InlineKeyboardMarkup(buttons)
-
 
