@@ -11,11 +11,11 @@ PAGE_SIZE = 6  # Default delay for messages in seconds
 @client.on_message(filters.private & filters.command("help"))
 async def help_cmd(c, m: Message):
     await m.reply_text(
-         "<b>How to use me?</b>\n\n"
-        "🔹 Just type any movie or file name.\n"
-        "🔹 I’ll show you the available links.\n"
-        "🔹 Click the one you want, and I’ll send it to you!\n\n"
-        "🎥 For latest movies, join @Batmanlinkz",
+         "<b>Hᴏᴡ ᴛᴏ Usᴇ Mᴇ?</b>\n\n"
+        "<b>🔹 Jᴜsᴛ Sᴇɴᴅ ᴀɴʏ Mᴏᴠɪᴇ Nᴀᴍᴇ.</b>\n"
+        "<b>🔹 I’ʟʟ Sʜᴏᴡ ʏᴏᴜ ᴛʜᴇ Aᴠᴀɪʟᴀʙʟᴇ Lɪɴᴋs ᴡɪᴛʜ Sɪᴢᴇs.</b>\n"
+        "<b>🔹 Cʟɪᴄᴋ ᴛʜᴇ Oɴᴇ ʏᴏᴜ Wᴀɴᴛ, ᴀɴᴅ I’ʟʟ Sᴇɴᴅ ɪᴛ ᴛᴏ Yᴏᴜ!</b>\n\n"
+        "<b>🎥 Fᴏʀ Lᴀᴛᴇsᴛ Mᴏᴠɪᴇs, Jᴏɪɴ @Batmanlinkz</b>",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("Join Here", url="https://t.me/batmanlinkz")]
         ])
@@ -275,25 +275,27 @@ async def start(c: Client, m: Message):
     # Private: show WebApp button (opens inside Telegram)
     if m.chat.type == enums.ChatType.PRIVATE:
         keyboard = InlineKeyboardMarkup([
-            [ InlineKeyboardButton("🚀 Open Mini App", web_app=WebAppInfo(url=MINI_APP_URL)) ],
-            [ InlineKeyboardButton("📢 Updates Channel", url=UPDATES_CHANNEL),
-              InlineKeyboardButton("Help❓", callback_data="help_info") ],
-            [ InlineKeyboardButton("🎬 Movie Group", url=MOVIES_GROUP) ]
+            [ InlineKeyboardButton("🚀 Oᴘᴇɴ Mɪɴɪ Aᴘᴘ", web_app=WebAppInfo(url=MINI_APP_URL)) ],
+            [ InlineKeyboardButton("📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ", url=UPDATES_CHANNEL),
+              InlineKeyboardButton("Hᴇʟᴘ❓", callback_data="help_info") ],
+            [ InlineKeyboardButton("🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ", url=MOVIES_GROUP) ]
         ])
     else:
         # Group: don't show web_app button (it may not behave well in groups),
         # show link to bot or channel instead
         keyboard = InlineKeyboardMarkup([
-            [ InlineKeyboardButton("➕ Add Me To Group", url=f"https://t.me/{BOT_USERNAME}?startgroup=true") ],
-            [ InlineKeyboardButton("📢 Updates Channel", url=UPDATES_CHANNEL),
-              InlineKeyboardButton("Help❓", callback_data="help_info") ],
+            [ InlineKeyboardButton("🚀 Oᴘᴇɴ Mɪɴɪ Aᴘᴘ", web_app=WebAppInfo(url=MINI_APP_URL)) ],
+            [ InlineKeyboardButton("📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ", url=UPDATES_CHANNEL),
+              InlineKeyboardButton("Hᴇʟᴘ❓", callback_data="help_info") ],
+            [ InlineKeyboardButton("🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ", url=MOVIES_GROUP) ],
         ])
 
     msg = await m.reply_text(
-        f"😎 ʜᴇʏ {name},\n\n"
-        "ɪ ᴀᴍ ᴀ ғɪʟᴛᴇʀ ʙᴏᴛ...\n\n"
-        "ғᴏʀ ɴᴇᴡ ᴍᴏᴠɪᴇs ᴊᴏɪɴ ʜᴇʀᴇ @Batmanlinkz\n\n"
-        "ᴛᴏ ᴋɴᴏᴡ ᴍᴏʀᴇ ᴄʟɪᴄᴋ ʜᴇʟᴘ ʙᴜᴛᴛᴏɴ.",
+        f"<b>😎 ʜᴇʏ {name},</b>\n\n"
+        "<b>ɪ ᴀᴍ Bᴀᴛᴍᴀɴ</b>\n\n"
+        "<b>ғᴏʀ ɴᴇᴡ ᴍᴏᴠɪᴇs ᴊᴏɪɴ ʜᴇʀᴇ @Batmanlinkz</b>\n\n"
+        "<b>Tᴏ Bʀᴏᴡsᴇ Sᴛᴏʀᴇᴅ Fɪʟᴇs Cʟɪᴄᴋ ᴏɴ Oᴘᴇɴ Mɪɴɪ Aᴘᴘ</b>\n\n"
+        "<b>ᴛᴏ ᴋɴᴏᴡ ᴍᴏʀᴇ ᴄʟɪᴄᴋ ʜᴇʟᴘ ʙᴜᴛᴛᴏɴ.</b>",
         reply_markup=keyboard,
         parse_mode=enums.ParseMode.HTML
     )
@@ -354,7 +356,8 @@ async def search(c: Client, m: Message):
                     pass
 
             msg = await m.reply(
-                "<b>Nᴏ Sᴇᴀʀᴄʜ Rᴇsᴜʟᴛ Fᴏᴜɴᴅ. Pᴏssɪʙʟᴇ Sᴘᴇʟʟɪɴɢ Mɪsᴛᴀᴋᴇ ᴏʀ Uɴʀᴇʟᴇᴀsᴇᴅ/Uɴᴀᴠᴀɪʟᴀʙʟᴇ Mᴏᴠɪᴇ ᴏɴ OTT Pʟᴀᴛғᴏʀᴍ (Theater Prints are not Available).</b>\n\n",
+                "<b>Nᴏ Sᴇᴀʀᴄʜ Rᴇsᴜʟᴛ Fᴏᴜɴᴅ. Pᴏssɪʙʟᴇ Sᴘᴇʟʟɪɴɢ Mɪsᴛᴀᴋᴇ ᴏʀ Uɴʀᴇʟᴇᴀsᴇᴅ/Uɴᴀᴠᴀɪʟᴀʙʟᴇ Mᴏᴠɪᴇ ᴏɴ OTT Pʟᴀᴛғᴏʀᴍ (Oɴʟʏ HD Pʀɪɴᴛs).</b>\n"
+                "<b>Sᴀᴠᴇᴅ ᴀs Rᴇqᴜᴇsᴛ:Aᴅᴍɪɴ Wɪʟʟ Nᴏᴛɪғʏ ʏᴏᴜ ɪғ ғɪʟᴇs Aᴅᴅᴇᴅ.</b>",
                 parse_mode=enums.ParseMode.HTML
             )
             asyncio.create_task(delete_after_delay(msg, DELETE_DELAY))
