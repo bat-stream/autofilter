@@ -415,3 +415,4 @@ async def index_files(c: Client, m: Message):
         }},
         upsert=True
     )
+  
