@@ -1,11 +1,14 @@
 import asyncio
 import re
+import random
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery,WebAppInfo
 from config import client, files_collection, GROUP_ID, BASE_URL, BOT_USERNAME,INDEX_CHANNEL,MINI_APP_URL, UPDATES_CHANNEL, MOVIES_GROUP,ADMIN_ID, LOG_CHANNEL,DELETE_DELAY,DELETE_AFTER
 from utils.helpers import save_user, delete_after_delay,users_collection,files_collection, check_sub_and_send_file,build_index_page,get_file_buttons,send_paginated_files
 
 PAGE_SIZE = 6  # Default delay for messages in seconds
+
+
 
 # ------------------ Group /start ------------------ #
 @client.on_message(filters.private & filters.command("help"))
@@ -303,6 +306,7 @@ async def start(c: Client, m: Message):
     # Auto-delete welcome in groups only
     if m.chat.type != enums.ChatType.PRIVATE:
         asyncio.create_task(delete_after_delay(msg, DELETE_AFTER))
+
 
 
 
