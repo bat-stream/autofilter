@@ -39,29 +39,85 @@ async def delete_after_delay(msg: Message, delay: int):
 
 # ------------------ File Parsing ------------------ #
 
-def extract_episode_info(name: str) -> str:
-    patterns = [
-        r"S\d{1,2}E\d{1,2}",
-        r"S\d{1,2}\s*E\d{1,2}",
-        r"S\d{1,2}\s*EP\d{1,2}",
-        r"EP?\d{1,2}",
+
+def extract_season_episode(filename: str):
+    name = filename.replace(".", " ").replace("_", " ").lower().strip()
+
+    # 1️⃣ Season + Episode Range (all hybrids)
+    range_patterns = [
+        # Season 4 Episode (01-08)
+        r'season\s*(\d{1,2})\s*episode\s*[\(\[\{]?\s*(\d{1,3})\s*[-–~to]+\s*(\d{1,3})[\)\]\}]?',
+        # S04 (01-08)
+        r's(\d{1,2})\s*[\(\[\{]?\s*(\d{1,3})\s*[-–~to]+\s*(\d{1,3})[\)\]\}]?',
+        # S04 (ep01-ep08) or S04(ep1–ep8)
+        r's(\d{1,2})\s*[\(\[\{]?\s*ep?\s*(\d{1,3})\s*[-–~to]+\s*ep?\s*(\d{1,3})[\)\]\}]?',
+        # S04 (e01-e08)
+        r's(\d{1,2})\s*[\(\[\{]?\s*e\s*(\d{1,3})\s*[-–~to]+\s*e?\s*(\d{1,3})[\)\]\}]?',
+        # S03E01 - E08 / S03EP01 - EP08 / S03E01 - 08
+        r's(\d{1,2})e?p?(\d{1,3})\s*[-–~to]+\s*e?p?(\d{1,3})',
+        # S04 01-08 (no explicit E)
+        r's(\d{1,2})\s*(\d{1,3})\s*[-–~to]+\s*(\d{1,3})',
     ]
-    combined = "|".join(patterns)
-    match = re.search(combined, name, re.IGNORECASE)
-    return match.group(0).replace(" ", "") if match else ""
+    for p in range_patterns:
+        if match := re.search(p, name, re.IGNORECASE):
+            season = match.group(1).zfill(2)
+            ep_start = match.group(2).zfill(2)
+            ep_end = match.group(3).zfill(2)
+            return f"S{season}EP{ep_start}-EP{ep_end}"
 
+    # 2️⃣ Season + Episode single
+    single_patterns = [
+        r'season\s*(\d{1,2})\s*episode\s*(\d{1,3})',
+        r'season\s*(\d{1,2})\s*ep?\s*(\d{1,3})',
+        r's(\d{1,2})\s*ep?\s*(\d{1,3})',
+        r's(\d{1,2})\s*e(\d{1,3})',
+        r's(\d{1,2})\s*(\d{1,3})',  # e.g. S04 08
+    ]
+    for p in single_patterns:
+        if match := re.search(p, name, re.IGNORECASE):
+            season = match.group(1).zfill(2)
+            episode = match.group(2).zfill(2)
+            return f"S{season}EP{episode}"
 
-def extract_season_episode(filename):
-    season_match = re.search(r'(S)(\d{1,2})', filename, re.IGNORECASE)
-    episode_match = re.search(r'(EP?)(\d{1,3})', filename, re.IGNORECASE)
-    if season_match and episode_match:
-        season_num = season_match.group(2).zfill(2)
-        episode_num = episode_match.group(2).zfill(2)
-        return f'S{season_num}EP{episode_num}'
-    elif episode_match:
-        episode_num = episode_match.group(2).zfill(2)
-        return f'EP{episode_num}'
+    # 3️⃣ Episode-only range (no season)
+    ep_range_patterns = [
+        r'\bep?\s*(\d{1,3})\s*[-–~to]+\s*ep?\s*(\d{1,3})\b',
+        r'\be\s*(\d{1,3})\s*[-–~to]+\s*e?\s*(\d{1,3})\b',
+        r'\b(\d{1,3})\s*[-–~to]+\s*(\d{1,3})\b',
+    ]
+    for p in ep_range_patterns:
+        if match := re.search(p, name, re.IGNORECASE):
+            ep_start = match.group(1).zfill(2)
+            ep_end = match.group(2).zfill(2)
+            return f"EP{ep_start}-EP{ep_end}"
+
+    # 4️⃣ Episode-only single
+    single_ep_patterns = [
+        r'\bep?\s*(\d{1,3})\b',
+        r'\be\s*(\d{1,3})\b',
+        r'\bepisode\s*(\d{1,3})\b',
+    ]
+    for p in single_ep_patterns:
+        if match := re.search(p, name, re.IGNORECASE):
+            return f"EP{match.group(1).zfill(2)}"
+
+    # 5️⃣ Season-only
+    season_patterns = [
+        r'\bs(\d{1,2})\b',
+        r'season\s*(\d{1,2})'
+    ]
+    for p in season_patterns:
+        if match := re.search(p, name, re.IGNORECASE):
+            return f"S{match.group(1).zfill(2)}"
+
+    # 6️⃣ Fallback: numeric episode detection (01, 1, etc.)
+    if fallback := re.search(r'\b(\d{1,3})\b', name):
+        num = int(fallback.group(1))
+        if 0 < num < 300:
+            return f"EP{str(num).zfill(2)}"
+
     return None
+
 
 
 def run_flask_app(flask_app):
@@ -73,34 +129,7 @@ def run_flask_app(flask_app):
     flask_app.run(host='0.0.0.0', port=port)
 
 PAGE_SIZE=6
-# ------------------ Index Page ------------------ #
 
-
-def build_custom_caption(file_name: str) -> str:
-    # Clean file name and append your custom text
-    clean_name = re.sub(r'^@[^_\s-]+[_\s-]*', '', file_name).strip()
-    return f"📄 {clean_name}\n\nBy @BatmanLinkz"
-
-
-
-async def send_file_with_caption(c, chat_id, msg_id):
-    original = await c.get_messages(chat_id=INDEX_CHANNEL, message_ids=msg_id)
-    
-    file_name = getattr(original.document, "file_name", None) or \
-                getattr(original.video, "file_name", None) or \
-                getattr(original.audio, "file_name", None) or \
-                original.caption or "File"
-
-    caption = build_custom_caption(file_name)
-
-    if original.document:
-        return await c.send_document(chat_id=chat_id, document=original.document.file_id, caption=caption, parse_mode=enums.ParseMode.HTML)
-    elif original.video:
-        return await c.send_video(chat_id=chat_id, video=original.video.file_id, caption=caption, parse_mode=enums.ParseMode.HTML)
-    elif original.audio:
-        return await c.send_audio(chat_id=chat_id, audio=original.audio.file_id, caption=caption, parse_mode=enums.ParseMode.HTML)
-    else:
-        return await c.copy_message(chat_id, INDEX_CHANNEL, msg_id)
 
 
 # ------------------ File Buttons & Pagination ------------------ #
@@ -234,10 +263,10 @@ async def check_sub_and_send_file(c: Client, m: Message, msg_id: int):
         await sent.delete()
 
         await warning.edit_text(
-            "<b>✅ Your message has been successfully deleted.</b>\n"
-            "<b>If you want it again, click below:</b>",
+            "<b>Yᴏᴜʀ Fɪʟᴇ ɪs Sᴜᴄᴄᴇssғᴜʟʟʏ Dᴇʟᴇᴛᴇᴅ.</b>\n"
+            "<b>Iғ ʏᴏᴜ Wᴀɴᴛ ᴛʜɪs Fɪʟᴇ Aɢᴀɪɴ ᴛʜᴇɴ Cʟɪᴄᴋ ᴏɴ Bᴇʟᴏᴡ Bᴜᴛᴛᴏɴ</b>",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📥 Get Message Again", url=f"{BASE_URL}/redirect?id={msg_id}")]
+                [InlineKeyboardButton("📥 Gᴇᴛ Fɪʟᴇ Aɢᴀɪɴ", url=f"{BASE_URL}/redirect?id={msg_id}")]
             ]),
             parse_mode=enums.ParseMode.HTML
         )
@@ -350,21 +379,39 @@ async def send_paginated_files(
 def get_file_buttons(files, query, page):
     total_files = len(files)
     start = page * PAGE_SIZE
-    end = min(start + PAGE_SIZE, total_files)  # ✅ prevent overflow
+    end = min(start + PAGE_SIZE, total_files)
     current_files = files[start:end]
     buttons = []
 
-    # Encode query safely
     encoded_query = urllib.parse.quote(query)
-
-    # ❌ Removed "📤 Send All" section
 
     for f in current_files:
         size_mb = round(f.get("file_size", 0) / (1024 * 1024), 2)
-        clean_name = re.sub(r'^@[^_\s-]+[_\s-]*', '', f['file_name']).strip()
+        name = f['file_name']
 
-        # Extract SxxExx if present
-        match = re.search(r'(S?\d{1,2})[\s._-]*[Vv]?[Oo]?[Ll]?[\s._-]*(E[Pp]?\d{1,3})', clean_name, re.IGNORECASE)
+        # ✅ Remove known uploader/channel names and any @tags or [MM]
+        clean_name = re.sub(
+            r'(\[MM\])|@(?:[\w\d_]+|Team_MCU|MCU_Linkz|BatmanLinkz|smile_upload|TCU_linkz|Team_HDT)',
+            '',
+            name,
+            flags=re.IGNORECASE
+        )
+
+        # ✅ Remove leftover credits or patterns like "- by @...", "(by ...)", "[by ...]"
+        clean_name = re.sub(r'[\(\[\{]?\s*(by|uploaded\s*by)?\s*@[\w\d_]+\s*[\)\]\}]?', '', clean_name, flags=re.IGNORECASE)
+
+        # ✅ Clean extra underscores, hyphens, dots, and multiple spaces
+        clean_name = re.sub(r'[_\.\-]{2,}', ' ', clean_name)
+        clean_name = re.sub(r'\s{2,}', ' ', clean_name)
+        clean_name = re.sub(r'^[\s._\-\[\]]+|[\s._\-\[\]]+$', '', clean_name).strip()
+
+        # ✅ Extract episode pattern like SxxEyy / Eyy / EPyy / SxxEyy-Ezz etc.
+        match = re.search(
+            r'(S?\d{1,2})[\s._-]*[Vv]?[Oo]?[Ll]?[\s._-]*(E[Pp]?\d{1,3})',
+            clean_name,
+            re.IGNORECASE
+        )
+
         if match:
             season = match.group(1).upper().replace("S", "").zfill(2)
             episode = re.sub(r"[^\d]", "", match.group(2)).zfill(2)
@@ -377,16 +424,17 @@ def get_file_buttons(files, query, page):
             InlineKeyboardButton(label, url=f"{BASE_URL}/redirect?id={f['message_id']}")
         ])
 
-    # ✅ Navigation buttons
+    # ✅ Pagination
     nav = []
-    if page > 0:  # not first page
+    if page > 0:
         nav.append(InlineKeyboardButton("⬅️ Pʀᴇᴠ", callback_data=f"page_{encoded_query}_{page - 1}"))
 
-    if (page + 1) * PAGE_SIZE < total_files:  # next page exists
+    if (page + 1) * PAGE_SIZE < total_files:
         nav.append(InlineKeyboardButton("Nᴇxᴛ ➡️", callback_data=f"page_{encoded_query}_{page + 1}"))
 
     if nav:
         buttons.append(nav)
 
     return InlineKeyboardMarkup(buttons)
+
 
