@@ -1,7 +1,7 @@
 from pyrogram import Client, filters, enums
 from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton,WebAppInfo
 from config import client, files_collection, INDEX_CHANNEL, BASE_URL,MINI_APP_URL, DELETE_AFTER, DELETE_AFTER_FILE, AUTH_CHANNELS,UPDATES_CHANNEL, MOVIES_GROUP,BOT_USERNAME
-from utils.helpers import save_user,get_file_buttons,build_index_page,get_not_joined_channels,delete_after_delay,check_sub_and_send_file,build_custom_caption,send_paginated_files,send_file_with_caption
+from utils.helpers import save_user,get_file_buttons,build_index_page,get_not_joined_channels,delete_after_delay,check_sub_and_send_file,send_paginated_files
 import asyncio, re
 from pyrogram.errors import MessageNotModified
 import urllib.parse
