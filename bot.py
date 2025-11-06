@@ -87,7 +87,11 @@ HOME_TEMPLATE = """
 
     <div class="home-actions">
       <button class="glow-btn" onclick="location.href='{{ url_for('files_list') }}'">📁 Vɪᴇᴡ Sᴛᴏʀᴇᴅ Fɪʟᴇs</button>
-      
+      <a class="glow-btn"
+   href="https://bat-stream.blogspot.com"
+   onclick="window.open('https://bat-stream.blogspot.com', '_system'); return false;">
+  🎬 Sᴛʀᴇᴀᴍɪɴɢ Wᴇʙsɪᴛᴇ
+</a>
   </div>
 
   <!-- Footer -->
@@ -130,6 +134,9 @@ HOME_TEMPLATE = """
 </body>
 </html>
 """
+
+
+
 
 # ---------- REDIRECT TEMPLATE (faster loading bar + top menu + tight ads + popup on click) ----------
 REDIRECT_TEMPLATE = """
@@ -259,6 +266,9 @@ REDIRECT_TEMPLATE = """
     <div>
       <a href="{{ url_for('home') }}">🏠 Home</a>
       <a href="{{ url_for('files_list') }}">📁 Files List</a>
+      <a href="https://bat-stream.blogspot.com" target="_blank">
+  🎬 Sᴛʀᴇᴀᴍɪɴɢ Wᴇʙsɪᴛᴇ
+</a>
       <a id="backBtn" href="#" style="display:none;">← Bᴀᴄᴋ</a>
     </div>
   </div>
