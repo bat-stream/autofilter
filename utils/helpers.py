@@ -10,7 +10,46 @@ from config import (
     AUTH_CHANNELS, GROUP_ID,MINI_APP_URL
 )
 
+REMOVE_TAGS = [
+    r'\[MM\]', r'\[MLM\]', r'\[MT\]', r'\[MS\]', r'\[MZM\]', r'\[CF\]', r'\[CP\]', r'\[NRX\]',
+    r'\[CT™\]', r'\[PsmOfficial\]', r'\[PFM\]', r'\[FC\]', r'\[KC\]', r'\[YM\]', r'\[A2M\]', r'\[CL\]',
+    r'@Team_MCU', r'@MCU_Linkz', r'@BatmanLinkz', r'@smile_upload', r'@TCU_linkz', r'@Team_HDT',
+    r'@UHD_Tamil', r'@MCUxLinks', r'@C\.C', r'@TamilAnimationToday', r'@Bucket_LinkZz', r'@PrimeMoviesOffl',
+    r'@Nesamani_Linkz', r'@Tamil_Link_Official', r'@TeamHDT', r'@Main_Channel_Noob', r'ATK', r'@HEVCHubX',
+    r'@SonyTamizh', r'@Movies_Tamizhaaas', r'@TamilCinemaToday', r'@IM_Eeswaran', r'©FC', r'@MM_Linkz',
+    r'@ContenTeam', r'@WorldCinemaToday', r'@MW_Linkz', r'@FBM', r'@MM_New', r'@WMR', r'@Hdnewtamilmoviwa4k',
+    r'@CC', r'@dubbedmovies', r'🄼🅂', r'@CEM', r'@AVA', r'@TR_Movies', r'@mersalananthu',
+    r'@TamilNewMovie_HD', r'@MC_4U', r'@GethXan_Moviez', r'www_TamilBlasters_me', r'mm', r'@trollmaa',
+    r'@GSR', r'@kc_dio', r'@FBM_Dubbed', r'@Tamilmoviez', r'@mobile_mm', r'@UploaditBot', r'@CC_All',
+    r'@Massmovies0', r'@GANGTAMIL_HD', r'@Team_TRR', r'@Moviezstuffofficial',
+    r'@Team_5G_', r'@Tamil_Mob_LinksZz', r'@MoviesNowLinks', r'@Movies_Worldda1', r'@Smile_upload',
+    r'@mtb_s', r'@Tamil_LinkzZ', r'@SPY_TALKIESS', r'@MOViEZHUNT', r'@SheikXMoviesOffl', r'@Hevc_Mob',
+    r'@VideoMemesTamizh', r'@Movies_Graft', r'@THHx265', r'@MoviiWrld', r'@HEVC_Moviesz',
+    r'@TamilDubFilms', r'@CelluloidCineClub', r'@sokfiles', r'@Rarefilms', r'𝙼𝚁✘', r'ꜰᴏ✘'
+]
+REMOVE_PATTERN = re.compile(
+    r'(' + '|'.join(REMOVE_TAGS) + r'|@[\w\d]+(?=[\s_\-\.]|$))',
+    flags=re.IGNORECASE
+)
 
+def clean_filename(name: str) -> str:
+    """Clean filename by removing tags, credits, and junk characters."""
+    # Remove known uploader/channel tags
+    name = re.sub(REMOVE_PATTERN, '', name)
+
+    # Remove leftover "by @..." or "(by ...)"
+    name = re.sub(
+        r'[\(\[\{]?\s*(by|uploaded\s*by)?\s*@[\w\d_]+\s*[\)\]\}]?',
+        '',
+        name,
+        flags=re.IGNORECASE
+    )
+
+    # Clean redundant underscores, dots, and spaces
+    name = re.sub(r'[_\.\-]{2,}', ' ', name)
+    name = re.sub(r'\s{2,}', ' ', name)
+    name = re.sub(r'^[\s._\-\[\]]+|[\s._\-\[\]]+$', '', name).strip()
+    return name
 
 # ------------------ User Utilities ------------------ #
 
@@ -40,50 +79,25 @@ async def delete_after_delay(msg: Message, delay: int):
 # ------------------ File Parsing ------------------ #
 
 
-def extract_season_episode(filename: str):
-    name = filename.replace(".", " ").replace("_", " ").lower().strip()
-
-    # 1️⃣ Season + Episode Range (all hybrids)
-    range_patterns = [
-        # Season 4 Episode (01-08)
-        r'season\s*(\d{1,2})\s*episode\s*[\(\[\{]?\s*(\d{1,3})\s*[-–~to]+\s*(\d{1,3})[\)\]\}]?',
-        # S04 (01-08)
-        r's(\d{1,2})\s*[\(\[\{]?\s*(\d{1,3})\s*[-–~to]+\s*(\d{1,3})[\)\]\}]?',
-        # S04 (ep01-ep08) or S04(ep1–ep8)
-        r's(\d{1,2})\s*[\(\[\{]?\s*ep?\s*(\d{1,3})\s*[-–~to]+\s*ep?\s*(\d{1,3})[\)\]\}]?',
-        # S04 (e01-e08)
-        r's(\d{1,2})\s*[\(\[\{]?\s*e\s*(\d{1,3})\s*[-–~to]+\s*e?\s*(\d{1,3})[\)\]\}]?',
-        # S03E01 - E08 / S03EP01 - EP08 / S03E01 - 08
-        r's(\d{1,2})e?p?(\d{1,3})\s*[-–~to]+\s*e?p?(\d{1,3})',
-        # S04 01-08 (no explicit E)
-        r's(\d{1,2})\s*(\d{1,3})\s*[-–~to]+\s*(\d{1,3})',
+def extract_season_episode(name: str):
+    # 1️⃣ Season + Episode range
+    patterns = [
+        r'[Ss](\d{1,2})[._\s-]*[EePp]+[._\s-]*(\d{1,3})',
+        r'[Ss]eason[._\s-]*(\d{1,2})[._\s-]*[Ee]pisode[._\s-]*(\d{1,3})',
+        r'[Ss](\d{1,2})[._\s-]*Ep[._\s-]*(\d{1,3})',
+        r'[Ss](\d{1,2})\s*[._-]*\s*ep\s*(\d{1,3})',
     ]
-    for p in range_patterns:
+    for p in patterns:
         if match := re.search(p, name, re.IGNORECASE):
-            season = match.group(1).zfill(2)
-            ep_start = match.group(2).zfill(2)
-            ep_end = match.group(3).zfill(2)
-            return f"S{season}EP{ep_start}-EP{ep_end}"
+            s = match.group(1).zfill(2)
+            e = match.group(2).zfill(2)
+            return f"S{s}EP{e}"
 
-    # 2️⃣ Season + Episode single
-    single_patterns = [
-        r'season\s*(\d{1,2})\s*episode\s*(\d{1,3})',
-        r'season\s*(\d{1,2})\s*ep?\s*(\d{1,3})',
-        r's(\d{1,2})\s*ep?\s*(\d{1,3})',
-        r's(\d{1,2})\s*e(\d{1,3})',
-        r's(\d{1,2})\s*(\d{1,3})',  # e.g. S04 08
-    ]
-    for p in single_patterns:
-        if match := re.search(p, name, re.IGNORECASE):
-            season = match.group(1).zfill(2)
-            episode = match.group(2).zfill(2)
-            return f"S{season}EP{episode}"
-
-    # 3️⃣ Episode-only range (no season)
+    # 2️⃣ Episode range only
     ep_range_patterns = [
         r'\bep?\s*(\d{1,3})\s*[-–~to]+\s*ep?\s*(\d{1,3})\b',
         r'\be\s*(\d{1,3})\s*[-–~to]+\s*e?\s*(\d{1,3})\b',
-        r'\b(\d{1,3})\s*[-–~to]+\s*(\d{1,3})\b',
+        r'\bepisode\s*(\d{1,3})\s*[-–~to]+\s*episode\s*(\d{1,3})\b',
     ]
     for p in ep_range_patterns:
         if match := re.search(p, name, re.IGNORECASE):
@@ -91,7 +105,7 @@ def extract_season_episode(filename: str):
             ep_end = match.group(2).zfill(2)
             return f"EP{ep_start}-EP{ep_end}"
 
-    # 4️⃣ Episode-only single
+    # 3️⃣ Single episode only
     single_ep_patterns = [
         r'\bep?\s*(\d{1,3})\b',
         r'\be\s*(\d{1,3})\b',
@@ -101,7 +115,7 @@ def extract_season_episode(filename: str):
         if match := re.search(p, name, re.IGNORECASE):
             return f"EP{match.group(1).zfill(2)}"
 
-    # 5️⃣ Season-only
+    # 4️⃣ Season-only
     season_patterns = [
         r'\bs(\d{1,2})\b',
         r'season\s*(\d{1,2})'
@@ -110,13 +124,13 @@ def extract_season_episode(filename: str):
         if match := re.search(p, name, re.IGNORECASE):
             return f"S{match.group(1).zfill(2)}"
 
-    # 6️⃣ Fallback: numeric episode detection (01, 1, etc.)
-    if fallback := re.search(r'\b(\d{1,3})\b', name):
-        num = int(fallback.group(1))
-        if 0 < num < 300:
-            return f"EP{str(num).zfill(2)}"
+    # 5️⃣ Ignore “chapter 1”, “part 1”, “volume 1”, etc.
+    if re.search(r'\b(chapter|part|movie|vol|volume)\s*\d{1,3}\b', name, re.IGNORECASE):
+        return None
 
+    # ✅ No fallback numeric detection
     return None
+
 
 
 
@@ -147,10 +161,11 @@ def build_index_page(files, page):
         file_size = f.get("file_size") or 0
         size_mb = round(file_size / (1024 * 1024), 2)
         file_name = f.get('file_name') or ''
-        clean_name = re.sub(r'^@[^_\s-]+[_\s-]*', '', file_name).strip()
+        clean_name = clean_filename(file_name)  # ✅ use your existing cleaner
         link = f"{BASE_URL}/redirect?id={f['message_id']}"
         lines.append(f"{i}. <a href='{link}'>{clean_name}</a> ({size_mb} MB)")
 
+    # Pagination buttons
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("⏮️ Fɪʀsᴛ", callback_data="indexpage_0"))
@@ -263,8 +278,8 @@ async def check_sub_and_send_file(c: Client, m: Message, msg_id: int):
         await sent.delete()
 
         await warning.edit_text(
-            "<b>Yᴏᴜʀ Fɪʟᴇ ɪs Sᴜᴄᴄᴇssғᴜʟʟʏ Dᴇʟᴇᴛᴇᴅ.</b>\n"
-            "<b>Iғ ʏᴏᴜ Wᴀɴᴛ ᴛʜɪs Fɪʟᴇ Aɢᴀɪɴ ᴛʜᴇɴ Cʟɪᴄᴋ ᴏɴ Bᴇʟᴏᴡ Bᴜᴛᴛᴏɴ</b>",
+            "<b>ʏᴏᴜʀ ғɪʟᴇ ɪs sᴜᴄᴄᴇssғᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ.</b>\n"
+            "<b>ɪғ ʏᴏᴜ ᴡᴀɴᴛ ᴛʜɪs ғɪʟᴇ ᴀɢᴀɪɴ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴏɴ ʙᴇʟᴏᴡ ʙᴜᴛᴛᴏɴ ↓</b>",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("📥 Gᴇᴛ Fɪʟᴇ Aɢᴀɪɴ", url=f"{BASE_URL}/redirect?id={msg_id}")]
             ]),
@@ -293,11 +308,10 @@ async def send_paginated_files(
     filename_query: str,
     query: CallbackQuery = None
 ):
-    """Send paginated files to user/group with improved messages and dynamic filename display."""
+    """Send paginated files to user/group with cleaned filenames."""
     user = await c.get_users(user_id)
     full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
 
-    # Pagination logic
     total_pages = (len(files) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
     page = max(0, min(page, total_pages - 1))
     start = page * ITEMS_PER_PAGE
@@ -308,12 +322,14 @@ async def send_paginated_files(
     text = (
         f"<b>👋 Hey {mention},</b>\n\n"
         f"<b>Your requested file(s) for:</b> <code>{filename_query}</code>\n"
-        f"<b>have been added and sent to the group ✅</b>\n\n"
+        f"<b>have been added✅</b>\n\n"
         f"<b>📄 Page:</b> {page + 1}/{total_pages}\n\n"
     )
 
+    # ✅ Apply cleaning before display
     for i, file_doc in enumerate(current_files, start=1):
-        file_name = file_doc["file_name"]
+        raw_name = file_doc["file_name"]
+        file_name = clean_filename(raw_name)
         file_size = round(file_doc.get("file_size", 0) / (1024 * 1024), 2)
         msg_id = file_doc["message_id"]
 
@@ -322,25 +338,23 @@ async def send_paginated_files(
             f"    <a href='{BASE_URL}/redirect?id={msg_id}'>📥 Get File</a>\n\n"
         )
 
-    # Navigation buttons
+    # Pagination buttons
     buttons = []
     nav_buttons = []
+    encoded_query = urllib.parse.quote(filename_query)
     if page > 0:
         nav_buttons.append(
-            InlineKeyboardButton("⬅️ Prev", callback_data=f"nav:{user_id}|{filename_query}:{page - 1}")
+            InlineKeyboardButton("⬅️ Prev", callback_data=f"nav:{user_id}|{encoded_query}:{page - 1}")
         )
     if page < total_pages - 1:
         nav_buttons.append(
-            InlineKeyboardButton("➡️ Next", callback_data=f"nav:{user_id}|{filename_query}:{page + 1}")
+            InlineKeyboardButton("➡️ Next", callback_data=f"nav:{user_id}|{encoded_query}:{page + 1}")
         )
     if nav_buttons:
         buttons.append(nav_buttons)
-
     markup = InlineKeyboardMarkup(buttons) if buttons else None
 
-    # Edit or send message
     if query:
-        # When using inline callback for navigation
         await query.edit_message_text(
             text,
             reply_markup=markup,
@@ -349,7 +363,6 @@ async def send_paginated_files(
         )
         msg = query.message
     else:
-        # Initial message — send to group
         msg = await c.send_message(
             GROUP_ID,
             text,
@@ -358,21 +371,18 @@ async def send_paginated_files(
             disable_web_page_preview=True
         )
 
-        # Notify the user privately (optional)
+        # Notify user in PM
         pm_text = (
-            f"<b>✅ Yᴏᴜʀ ʀᴇᴏ̨ᴜᴇsᴛᴇᴅ ғɪʟᴇs ғᴏʀ <code>{filename_query}</code></b> "
-            f"<b>ʜᴀᴠᴇ ʙᴇᴇɴ sᴜᴄᴄᴇssғᴜʟʟʏ ᴀᴅᴅᴇᴅ ᴀɴᴅ sᴇɴᴛ ᴛᴏ ᴛʜᴇ ɢʀᴏᴜᴘ.</b>\n\n"
-            f"<b><a href='https://t.me/+Dzcz5yk-ayFjODZl'>Cʟɪᴄᴋ Hᴇʀᴇ ᴛᴏ Vɪᴇᴡ</a></b>"
+            f"<b>✅ Your requested files for <code>{filename_query}</code></b> "
+            f"<b>have been successfully added and sent to the group.</b>\n\n"
+            f"<b><a href='https://t.me/+Dzcz5yk-ayFjODZl'>Click Here to View</a></b>"
         )
-
         try:
             await c.send_message(user_id, pm_text, parse_mode=enums.ParseMode.HTML)
         except Exception:
             pass
 
-    # Schedule message deletion
     asyncio.create_task(delete_after_delay(msg, DELETE_DELAY_REQ))
-
 
 
 
@@ -386,39 +396,23 @@ def get_file_buttons(files, query, page):
     encoded_query = urllib.parse.quote(query)
 
     for f in current_files:
-        size_mb = round(f.get("file_size", 0) / (1024 * 1024), 2)
-        name = f['file_name']
-
-        # ✅ Remove known uploader/channel names and any @tags or [MM]
-        clean_name = re.sub(
-            r'(\[MM\])|@(?:[\w\d_]+|Team_MCU|MCU_Linkz|BatmanLinkz|smile_upload|TCU_linkz|Team_HDT)',
-            '',
-            name,
-            flags=re.IGNORECASE
-        )
-
-        # ✅ Remove leftover credits or patterns like "- by @...", "(by ...)", "[by ...]"
-        clean_name = re.sub(r'[\(\[\{]?\s*(by|uploaded\s*by)?\s*@[\w\d_]+\s*[\)\]\}]?', '', clean_name, flags=re.IGNORECASE)
-
-        # ✅ Clean extra underscores, hyphens, dots, and multiple spaces
-        clean_name = re.sub(r'[_\.\-]{2,}', ' ', clean_name)
-        clean_name = re.sub(r'\s{2,}', ' ', clean_name)
-        clean_name = re.sub(r'^[\s._\-\[\]]+|[\s._\-\[\]]+$', '', clean_name).strip()
-
-        # ✅ Extract episode pattern like SxxEyy / Eyy / EPyy / SxxEyy-Ezz etc.
-        match = re.search(
-            r'(S?\d{1,2})[\s._-]*[Vv]?[Oo]?[Ll]?[\s._-]*(E[Pp]?\d{1,3})',
-            clean_name,
-            re.IGNORECASE
-        )
-
-        if match:
-            season = match.group(1).upper().replace("S", "").zfill(2)
-            episode = re.sub(r"[^\d]", "", match.group(2)).zfill(2)
-            episode_info = f"S{season}EP{episode}"
-            label = f"🎞 {size_mb}MB | {episode_info} | {clean_name}"
+        file_size = f.get("file_size", 0)
+        # ✅ Auto-format size: show in GB if >= 1024 MB
+        size_mb = file_size / (1024 * 1024)
+        if size_mb >= 1024:
+            size_str = f"{round(size_mb / 1024, 2)} GB"
         else:
-            label = f"🎞 {size_mb}MB | {clean_name}"
+            size_str = f"{round(size_mb, 2)} MB"
+
+        name = f["file_name"]
+        clean_name = clean_filename(name)
+        episode_info = extract_season_episode(clean_name)
+
+        # ✅ Build label
+        if episode_info:
+            label = f"🎞 {size_str} | {episode_info} | {clean_name}"
+        else:
+            label = f"🎞 {size_str} | {clean_name}"
 
         buttons.append([
             InlineKeyboardButton(label, url=f"{BASE_URL}/redirect?id={f['message_id']}")
@@ -428,13 +422,15 @@ def get_file_buttons(files, query, page):
     nav = []
     if page > 0:
         nav.append(InlineKeyboardButton("⬅️ Pʀᴇᴠ", callback_data=f"page_{encoded_query}_{page - 1}"))
-
     if (page + 1) * PAGE_SIZE < total_files:
         nav.append(InlineKeyboardButton("Nᴇxᴛ ➡️", callback_data=f"page_{encoded_query}_{page + 1}"))
-
     if nav:
         buttons.append(nav)
 
     return InlineKeyboardMarkup(buttons)
+
+
+
+
 
 
