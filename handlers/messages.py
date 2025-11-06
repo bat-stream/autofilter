@@ -7,9 +7,18 @@ from config import client, files_collection, GROUP_ID, BASE_URL, BOT_USERNAME,IN
 from utils.helpers import save_user, delete_after_delay,users_collection,files_collection, check_sub_and_send_file,build_index_page,get_file_buttons,send_paginated_files
 
 PAGE_SIZE = 6  # Default delay for messages in seconds
+MAINTENANCE_MODE = False
 
 
-
+@client.on_message(~filters.user(ADMIN_ID))
+async def check_maintenance(c: Client, m: Message):
+    global MAINTENANCE_MODE
+    if MAINTENANCE_MODE:
+        return await m.reply(
+            "⚠️ The bot is currently **under maintenance**.\n"
+            "Please try again later 🛠️",
+            quote=True
+        )
 # ------------------ Group /start ------------------ #
 @client.on_message(filters.private & filters.command("help"))
 async def help_cmd(c, m: Message):
@@ -177,6 +186,28 @@ async def broadcast(_, m: Message):
         await asyncio.sleep(0.1)
 
     await m.reply(f"✅ Broadcast done.\n✔️ Sent: {sent}\n❌ Failed: {failed}")
+
+
+@client.on_message(filters.command("maintenance") & filters.user(ADMIN_ID))
+async def toggle_maintenance(c: Client, m: Message):
+    global MAINTENANCE_MODE
+    try:
+        if len(m.command) < 2:
+            return await m.reply("⚙️ Usage:\n`/maintenance on` or `/maintenance off`", parse_mode="markdown")
+
+        arg = m.command[1].lower()
+        if arg == "on":
+            MAINTENANCE_MODE = True
+            await m.reply("🚧 Maintenance mode is now **ON**.\nUsers will see a maintenance message.")
+        elif arg == "off":
+            MAINTENANCE_MODE = False
+            await m.reply("✅ Maintenance mode is now **OFF**.\nBot is active again.")
+        else:
+            await m.reply("❗ Use `/maintenance on` or `/maintenance off` only.", parse_mode="markdown")
+    except Exception as e:
+        await m.reply(f"❌ Error: `{e}`", parse_mode="markdown")
+        
+
 
 # ------------------ Pagination Callback ------------------ #
 @client.on_callback_query(filters.regex(r"^nav:(\d+)\|(.+):(\d+)$"))
