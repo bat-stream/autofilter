@@ -1,5 +1,13 @@
 import threading
 from math import ceil
+import asyncio
+import signal
+import os
+import time
+import traceback
+import sys
+import config
+from pyrogram import idle
 from flask import Flask, request, render_template_string, redirect, url_for
 from pymongo import DESCENDING
 from config import client, files_collection, BOT_USERNAME
@@ -10,6 +18,9 @@ import handlers.messages
 import handlers.members
 import commands.admin
 import commands.user
+
+STOP_TIMEOUT = 6  # seconds to wait for client.stop() before force-exit
+FLASK_JOIN_TIMEOUT = 2 
 
 app = Flask(__name__)
 
@@ -799,11 +810,118 @@ def files_list():
 
 # ---------- Run (flask + your telegram client) ----------
 def run_flask():
-    # accessible on all interfaces; change host/port if needed
     app.run(host="0.0.0.0", port=5000, debug=False)
 
-if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True  # ✅ this allows Flask to exit when main thread stops
-    flask_thread.start()
-    client.run()
+def run_flask_server():
+    # IMPORTANT: disable the reloader so there aren't extra processes/threads
+    # and ensure it doesn't block shutdown unexpectedly
+    try:
+        app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"[FLASK] Exception in flask thread: {e}")
+
+# Start Flask in a daemon thread so Python can exit even if Flask is running
+flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+flask_thread.start()
+
+# Start pyrogram client and resolve chats
+client.start()
+loop = asyncio.get_event_loop()
+loop.run_until_complete(config.resolve_all_chats())
+loop.run_until_complete(config.check_bot_admin_rights())
+
+print("[READY] ✅ Bot started. Waiting for events... (Ctrl+C to stop)")
+
+# STOP coordination
+_stop_event = threading.Event()
+_stop_lock = threading.Lock()
+_stop_in_progress = False
+
+def _do_stop_and_signal():
+    """Call client.stop() in a thread and signal completion via _stop_event."""
+    try:
+        print("[SHUTDOWN] Calling client.stop() ...")
+        client.stop()
+        print("[SHUTDOWN] client.stop() finished.")
+    except Exception as e:
+        print(f"[SHUTDOWN] client.stop() raised: {e}")
+        traceback.print_exc()
+    finally:
+        _stop_event.set()
+
+def _signal_handler(sig, frame):
+    """
+    Signal handler spawns a stopper thread and returns quickly.
+    The main thread will then wait for the stop to finish with a timeout.
+    """
+    global _stop_in_progress
+    with _stop_lock:
+        if _stop_in_progress:
+            print(f"[SHUTDOWN] signal {sig} received, stop already in progress.")
+            return
+        _stop_in_progress = True
+
+    print(f"\n[SHUTDOWN] Received signal {sig}. Initiating shutdown...")
+
+    # Spawn a thread to run blocking client.stop()
+    t = threading.Thread(target=_do_stop_and_signal, daemon=True)
+    t.start()
+
+# Register handlers
+signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
+
+# Wait for events; idle() returns when a signal is received
+try:
+    idle()
+except KeyboardInterrupt:
+    print("[SHUTDOWN] KeyboardInterrupt received, proceeding to shutdown.")
+finally:
+    print("[SHUTDOWN] Cleaning up...")
+
+    # Wait for the stop action to complete up to STOP_TIMEOUT seconds
+    waited = 0.0
+    poll_interval = 0.1
+    while not _stop_event.is_set() and waited < STOP_TIMEOUT:
+        time.sleep(poll_interval)
+        waited += poll_interval
+
+    if _stop_event.is_set():
+        print(f"[SHUTDOWN] client.stop() completed within {waited:.1f}s.")
+    else:
+        # client.stop() didn't complete in time -> print diagnostics and force exit
+        print(f"[SHUTDOWN] client.stop() did NOT finish within {STOP_TIMEOUT}s. Forcing exit.")
+        print("[SHUTDOWN] Active threads:")
+        for t in threading.enumerate():
+            print(f"  - {t.name} (daemon={t.daemon})")
+
+        # print pending asyncio tasks for diagnosis (if event loop still running)
+        try:
+            loop = asyncio.get_event_loop()
+            pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+            print(f"[SHUTDOWN] Pending asyncio tasks: {len(pending)}")
+            for p in pending[:10]:
+                print("  -", p.get_coro())
+        except Exception as e:
+            print("[SHUTDOWN] Could not list asyncio tasks:", e)
+
+        # strong termination
+        try:
+            # attempt graceful stop of client again in background
+            threading.Thread(target=_do_stop_and_signal, daemon=True).start()
+            time.sleep(0.35)
+        except Exception:
+            pass
+
+        # Last-resort: kill the process to avoid stuck state
+        print("[SHUTDOWN] Exiting process via os._exit(0).")
+        os._exit(0)
+
+    # Try joining Flask thread briefly (daemon thread won't block exit)
+    try:
+        flask_thread.join(timeout=FLASK_JOIN_TIMEOUT)
+    except Exception:
+        pass
+
+    print("[SHUTDOWN] Exiting now.")
+    sys.exit(0)
