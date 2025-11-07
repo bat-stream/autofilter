@@ -10,7 +10,7 @@ import config
 from pyrogram import idle
 from flask import Flask, request, render_template_string, redirect, url_for
 from pymongo import DESCENDING
-from config import client, files_collection, BOT_USERNAME
+from config import client, files_collection, BOT_USERNAME,start_preloader
 
 # Import handlers so they register (if needed by your bot)
 import handlers.callbacks
@@ -813,115 +813,119 @@ def run_flask():
     app.run(host="0.0.0.0", port=5000, debug=False)
 
 def run_flask_server():
-    # IMPORTANT: disable the reloader so there aren't extra processes/threads
-    # and ensure it doesn't block shutdown unexpectedly
+    """Run Flask without reloader so it doesn't spawn extra threads."""
     try:
         app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
     except Exception as e:
-        print(f"[FLASK] Exception in flask thread: {e}")
+        print(f"[FLASK] Exception in Flask thread: {e}")
 
-# Start Flask in a daemon thread so Python can exit even if Flask is running
-flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+# Start Flask in background (daemon)
+flask_thread = threading.Thread(target=run_flask_server, daemon=True, name="flask-thread")
 flask_thread.start()
 
-# Start pyrogram client and resolve chats
-client.start()
+# Start Pyrogram client
+try:
+    config.client.start()
+except Exception as e:
+    print("[ERROR] Failed to start Pyrogram client:", e)
+    # If client failed to start, stop flask thread and exit
+    try:
+        flask_thread.join(timeout=1)
+    except Exception:
+        pass
+    raise SystemExit(1)
+
+# Use the running event loop for async helpers
 loop = asyncio.get_event_loop()
-loop.run_until_complete(config.resolve_all_chats())
-loop.run_until_complete(config.check_bot_admin_rights())
+
+# Run async post-start tasks: save session, write marker, preload chats
+async def _post_start_tasks():
+    # 1) Try to save session to DB (non-fatal)
+    if hasattr(config, "save_session_to_db"):
+        try:
+            await config.save_session_to_db()
+        except Exception as e:
+            print("[SESSION] save_session_to_db() failed (non-fatal):", e)
+
+    # 2) Write session string to a short file (non-fatal)
+    if hasattr(config, "save_session_string_to_file"):
+        try:
+            res = await config.save_session_string_to_file()
+            if res:
+                print(f"[SESSION] session string file saved: {res}")
+        except Exception as e:
+            print("[SESSION] save_session_string_to_file() failed (non-fatal):", e)
+
+    # 3) Write a short session marker so /tmp/pyro_sessions shows a friendly name
+    if hasattr(config, "write_short_session_marker"):
+        try:
+            marker = config.write_short_session_marker()
+            if marker:
+                print(f"[SESSION] wrote marker: {marker}")
+        except Exception as e:
+            print("[SESSION] write_short_session_marker() failed (non-fatal):", e)
+
+    # 4) start_preloader: optional, non-fatal
+    if hasattr(config, "start_preloader"):
+        try:
+            await config.start_preloader()
+        except Exception as e:
+            print("[WARN] start_preloader() failed (non-fatal):", e)
+
+# Run the async post-start tasks synchronously here
+try:
+    loop.run_until_complete(_post_start_tasks())
+except Exception as e:
+    print("[WARN] Post-start tasks encountered an error:", e)
 
 print("[READY] ✅ Bot started. Waiting for events... (Ctrl+C to stop)")
 
-# STOP coordination
-_stop_event = threading.Event()
-_stop_lock = threading.Lock()
-_stop_in_progress = False
+# -------- Graceful shutdown --------
+SHUTDOWN_WAIT = 6.0  # seconds to wait for graceful stop
 
-def _do_stop_and_signal():
-    """Call client.stop() in a thread and signal completion via _stop_event."""
+def _shutdown_and_exit(signame):
+    """Stop client and exit (called on signal)."""
+    print(f"\n[SHUTDOWN] Received {signame}. Stopping client...")
     try:
-        print("[SHUTDOWN] Calling client.stop() ...")
-        client.stop()
-        print("[SHUTDOWN] client.stop() finished.")
+        # call stop() synchronously — Pyrogram's sync wrapper will run it on loop
+        config.client.stop()
+        print("[SHUTDOWN] client.stop() returned.")
     except Exception as e:
-        print(f"[SHUTDOWN] client.stop() raised: {e}")
-        traceback.print_exc()
-    finally:
-        _stop_event.set()
+        print("[SHUTDOWN] client.stop() raised:", e)
+
+    # join Flask thread briefly (daemon thread won't block if still running)
+    try:
+        flask_thread.join(timeout=1.0)
+    except Exception:
+        pass
+
+    print("[SHUTDOWN] Exiting now.")
+    sys.exit(0)
 
 def _signal_handler(sig, frame):
-    """
-    Signal handler spawns a stopper thread and returns quickly.
-    The main thread will then wait for the stop to finish with a timeout.
-    """
-    global _stop_in_progress
-    with _stop_lock:
-        if _stop_in_progress:
-            print(f"[SHUTDOWN] signal {sig} received, stop already in progress.")
-            return
-        _stop_in_progress = True
-
-    print(f"\n[SHUTDOWN] Received signal {sig}. Initiating shutdown...")
-
-    # Spawn a thread to run blocking client.stop()
-    t = threading.Thread(target=_do_stop_and_signal, daemon=True)
-    t.start()
+    # Map signal numbers to names nicely
+    name = signal.Signals(sig).name if hasattr(signal, "Signals") else str(sig)
+    # Call shutdown helper
+    _shutdown_and_exit(name)
 
 # Register handlers
 signal.signal(signal.SIGINT, _signal_handler)
 signal.signal(signal.SIGTERM, _signal_handler)
 
-# Wait for events; idle() returns when a signal is received
+# Keep process alive until killed
 try:
     idle()
 except KeyboardInterrupt:
-    print("[SHUTDOWN] KeyboardInterrupt received, proceeding to shutdown.")
+    print("[SHUTDOWN] KeyboardInterrupt received.")
+    _shutdown_and_exit("KeyboardInterrupt")
 finally:
-    print("[SHUTDOWN] Cleaning up...")
-
-    # Wait for the stop action to complete up to STOP_TIMEOUT seconds
-    waited = 0.0
-    poll_interval = 0.1
-    while not _stop_event.is_set() and waited < STOP_TIMEOUT:
-        time.sleep(poll_interval)
-        waited += poll_interval
-
-    if _stop_event.is_set():
-        print(f"[SHUTDOWN] client.stop() completed within {waited:.1f}s.")
-    else:
-        # client.stop() didn't complete in time -> print diagnostics and force exit
-        print(f"[SHUTDOWN] client.stop() did NOT finish within {STOP_TIMEOUT}s. Forcing exit.")
-        print("[SHUTDOWN] Active threads:")
-        for t in threading.enumerate():
-            print(f"  - {t.name} (daemon={t.daemon})")
-
-        # print pending asyncio tasks for diagnosis (if event loop still running)
-        try:
-            loop = asyncio.get_event_loop()
-            pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-            print(f"[SHUTDOWN] Pending asyncio tasks: {len(pending)}")
-            for p in pending[:10]:
-                print("  -", p.get_coro())
-        except Exception as e:
-            print("[SHUTDOWN] Could not list asyncio tasks:", e)
-
-        # strong termination
-        try:
-            # attempt graceful stop of client again in background
-            threading.Thread(target=_do_stop_and_signal, daemon=True).start()
-            time.sleep(0.35)
-        except Exception:
-            pass
-
-        # Last-resort: kill the process to avoid stuck state
-        print("[SHUTDOWN] Exiting process via os._exit(0).")
-        os._exit(0)
-
-    # Try joining Flask thread briefly (daemon thread won't block exit)
+    # Safety: ensure client stopped if we somehow reach here
     try:
-        flask_thread.join(timeout=FLASK_JOIN_TIMEOUT)
+        config.client.stop()
     except Exception:
         pass
-
-    print("[SHUTDOWN] Exiting now.")
+    try:
+        flask_thread.join(timeout=1.0)
+    except Exception:
+        pass
     sys.exit(0)
