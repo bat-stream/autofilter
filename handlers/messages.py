@@ -3,12 +3,32 @@ import re
 import random
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery,WebAppInfo
-from config import client, files_collection, GROUP_ID, BASE_URL, BOT_USERNAME,INDEX_CHANNEL,MINI_APP_URL, UPDATES_CHANNEL, MOVIES_GROUP,ADMIN_ID, LOG_CHANNEL,DELETE_DELAY,DELETE_AFTER
+from config import client,save_session_to_db,load_session_from_db, files_collection, GROUP_ID, BASE_URL, BOT_USERNAME,INDEX_CHANNEL,MINI_APP_URL, UPDATES_CHANNEL, MOVIES_GROUP,ADMIN_ID, LOG_CHANNEL,DELETE_DELAY,DELETE_AFTER
 from utils.helpers import save_user, delete_after_delay,users_collection,files_collection, check_sub_and_send_file,build_index_page,get_file_buttons,send_paginated_files
 
 PAGE_SIZE = 6  # Default delay for messages in seconds
 
 
+
+
+
+@client.on_message(filters.command("uploadsession") & filters.user(ADMIN_ID))
+async def upload_session_handler(c, m):
+    await m.reply("🔄 Exporting session and saving to DB... Please wait.", quote=True)
+    ok = await save_session_to_db()
+    if ok:
+        await m.reply("✅ Session saved to MongoDB.", quote=True)
+    else:
+        await m.reply("❌ Failed to save session. Check logs.", quote=True)
+
+
+@client.on_message(filters.command("showsession") & filters.user(ADMIN_ID))
+async def showsession(c, m):
+    s = load_session_from_db()
+    if s:
+        await m.reply("✅ Session exists in DB.", quote=True)
+    else:
+        await m.reply("❌ No session stored in DB yet.", quote=True)
 
 # ------------------ Group /start ------------------ #
 @client.on_message(filters.private & filters.command("help"))
