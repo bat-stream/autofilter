@@ -928,42 +928,114 @@ DASHBOARD_TEMPLATE = r"""
   flex-wrap: wrap;
   justify-content: space-between;
 }
-    @media(max-width:900px){
-        .card-file {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 14px;
+    /* Mobile-only styles (drop-in) */
+@media (max-width: 900px) {
+  :root{
+    --mobile-font-base: 13px;
+    --mobile-font-small: 11px;
+    --mobile-btn-padding-vertical: 8px;
+    --mobile-btn-padding-horizontal: 10px;
+    --mobile-btn-radius: 9px;
+    --mobile-card-padding: 10px;
+    --mobile-gap: 8px;
   }
 
+  /* Card becomes a vertical stack for touch-friendly layout */
+  .card-file {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: var(--mobile-card-padding) !important;
+    gap: var(--mobile-gap) !important;
+  }
+
+  /* Remove desktop reserved right margin so meta can use full width */
   .card-file .meta {
-    margin-right: 0;
-    width: 100%;
+    margin-right: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    text-align: left !important;
   }
 
+  /* File name: allow up to 2 lines, smaller text */
+  .card-file .meta .file-name,
+  .card-file .meta > div > .file-name,
+  .card-file .meta > div > div:first-child {
+    font-size: var(--mobile-font-base) !important;
+    line-height: 1.2 !important;
+    white-space: normal !important;
+    overflow: hidden !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important; /* max 2 lines */
+    -webkit-box-orient: vertical !important;
+    word-break: break-word !important;
+  }
+
+  /* Smaller secondary text */
+  .card-file .small {
+    font-size: var(--mobile-font-small) !important;
+    margin-top: 6px;
+  }
+
+  /* Keep checkbox + first-line meta compact */
+  .card-file > div[style*="flex: 0 0 auto;"],
+  .card-file > input[type="checkbox"],
+  .card-file .meta {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  /* Improve checkbox hit area */
+  .card-file input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    margin: 0 !important;
+  }
+
+  /* Actions flow below meta, full-width touch targets */
   .card-file .actions {
-    position: static;
-    transform: none;
-    margin-top: 10px;
-    width: 100%;
-    justify-content: flex-start;
+    position: static !important;
+    transform: none !important;
+    margin-top: 8px !important;
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px !important;
+    justify-content: space-between !important;
+    padding-top: 8px !important;
+    border-top: 1px solid rgba(255,255,255,0.03) !important;
   }
-  #searchForm {
-    flex-direction: column;
-    align-items: stretch;
+
+  /* Buttons: reduced size, fill space evenly */
+  .card-file .actions .btn {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    padding: var(--mobile-btn-padding-vertical) var(--mobile-btn-padding-horizontal) !important;
+    font-size: var(--mobile-font-small) !important;
+    border-radius: var(--mobile-btn-radius) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
-  .search-field {
-    width: 100%;
+
+  /* Slight visual tweak for danger button to remain prominent */
+  .card-file .actions .btn-danger {
+    padding-top: calc(var(--mobile-btn-padding-vertical) - 1px) !important;
+    padding-bottom: calc(var(--mobile-btn-padding-vertical) - 1px) !important;
   }
-  .btn-primary, .btn-ghost {
-    width: 100%;
-    text-align: center;
+
+  /* Optional: stack buttons vertically on very small screens */
+  @media (max-width: 420px) {
+    .card-file .actions {
+      flex-direction: column !important;
+    }
+    .card-file .actions .btn {
+      width: 100% !important;
+    }
   }
-    .search-advanced { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .search-advanced input { padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:var(--text); }
-    .badge { background:rgba(255,255,255,0.03); padding:6px 8px; border-radius:8px; font-size:0.9rem; color:var(--text) }
-    .alert { padding:10px 12px; border-radius:8px; margin-bottom:12px; }
-    .alert-success { background:rgba(0,200,120,0.08); color:#adffcc; border:1px solid rgba(0,200,120,0.08); }
-    .alert-error { background:rgba(255,120,120,0.06); color:#ffcccc; border:1px solid rgba(255,120,120,0.06); }
+}
+
+    
   </style>
 </head>
 <body>
