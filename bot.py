@@ -8,8 +8,12 @@ import traceback
 import sys
 import config
 from pyrogram import idle
-from flask import Flask, request, render_template_string, redirect, url_for
+from flask import Flask, request, render_template_string, redirect, url_for, session, flash, jsonify
 from pymongo import DESCENDING
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+from bson.objectid import ObjectId
 from config import client, files_collection, BOT_USERNAME,start_preloader
 
 # Import handlers so they register (if needed by your bot)
@@ -18,12 +22,23 @@ import handlers.messages
 import handlers.members
 import commands.admin
 import commands.user
+from utils.helpers import clean_filename
 
 STOP_TIMEOUT = 6  # seconds to wait for client.stop() before force-exit
 FLASK_JOIN_TIMEOUT = 2 
 
+
+
+# Use users_collection from config (you already set this in config.py)
+users_collection = getattr(config, "users_collection", None)
+if users_collection is None:
+    print("[WARN] config.users_collection not found — create it in config.py to enable admin users.")
+
+
 app = Flask(__name__)
 
+# Ensure Flask has a secret key (set FLASK_SECRET in env)
+app.secret_key = os.environ.get("FLASK_SECRET", "change-this-secret")
 # ---------- Common CSS / header fragments ----------
 # Keep theme consistent across pages
 COMMON_HEAD = """
@@ -733,7 +748,358 @@ FILES_TEMPLATE = """
 
 
 
+# ---- Login template ----
+LOGIN_TEMPLATE = r"""
+<!doctype html><html><head><meta charset="utf-8"><title>Admin Login</title>""" + COMMON_HEAD + r"""
+<style>
+.login-box{max-width:420px;margin:80px auto;padding:18px;border-radius:12px}
+input{width:100%;padding:10px;margin:6px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--text)}
+button{padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(90deg,var(--accent),var(--primary));color:#032;font-weight:600}
+</style>
+</head><body><div class="container"><div class="login-box card">
+  <h2 style="margin-top:0">Admin Login</h2>
+  {% with msgs = get_flashed_messages() %}
+    {% if msgs %}
+      <div style="color:#ffb3b3;padding:8px;border-radius:8px;background:rgba(255,120,120,0.03)">{{ msgs[0] }}</div>
+    {% endif %}
+  {% endwith %}
+  <form method="post">
+    <label>Username</label><br><input name="username" autofocus required><br>
+    <label>Password</label><br><input name="password" type="password" required><br><br>
+    <button type="submit">Login</button>
+  </form>
+  <p class="small" style="margin-top:10px">Create admin with <code>create_admin(username,password)</code> helper.</p>
+</div></div></body></html>
+"""
 
+# ---- Dashboard template (search only, human-readable size) ----
+DASHBOARD_TEMPLATE = r"""
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Admin Dashboard - Files</title>
+  """ + COMMON_HEAD + r"""
+  <style>
+    
+    .actions{display:flex;gap:8px}
+    .danger{background:linear-gradient(90deg,#ff7a7a,#ffb3b3);color:#2b0000}
+    .small{color:rgba(230,247,251,0.78)}
+    .btn { padding:10px 14px; border-radius:10px; border:none; cursor:pointer; font-weight:600; }
+    .btn-primary { background:linear-gradient(90deg,var(--accent),var(--primary)); color:#032; box-shadow:0 8px 30px rgba(0,188,212,0.08); }
+    .btn-ghost { background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--text); }
+    .btn-danger { background:linear-gradient(90deg,#ff7a7a,#ffb3b3); color:#2b0000; }
+    .btn-sm { padding:8px 10px; font-size:0.95rem; border-radius:8px; }
+   /* ===== Reliable row layout: flex + pinned right-side actions ===== */
+/* ===== Forced layout: pin actions to the far right ===== */
+.card-file {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 14px 18px 14px 18px !important;  /* keep left padding, we'll reserve space with meta */
+  border-radius: 10px !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  background: rgba(255,255,255,0.02) !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+/* Reserve space for the actions on the right so content never reaches them */
+.card-file .meta {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;        /* allow ellipsis */
+  margin-right: 260px !important; /* <-- increase this to push actions further right */
+  text-align: left !important;
+}
+
+/* File name: prefer single-line with ellipsis on desktop */
+.card-file .meta .file-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Pin the action buttons absolutely to the far right of the card */
+.card-file .actions {
+  position: absolute !important;
+  right: 4px !important;        /* try 4px (near flush). change to 0 or 8px if you prefer */
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  z-index: 999 !important;
+  white-space: nowrap !important;
+}
+
+/* Buttons sizing so they fit within reserved width */
+.card-file .actions .btn {
+  min-width: 72px !important;
+  padding: 8px 12px !important;
+  justify-content: center !important;
+}
+
+    /* --- Stylish Search Bar Redesign --- */
+.search-field {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-size: 1rem;
+  letter-spacing: 0.2px;
+  transition: all 0.25s ease;
+  outline: none;
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.search-field::placeholder {
+  color: rgba(230, 247, 251, 0.5);
+  font-style: italic;
+}
+
+.search-field:focus {
+  border-color: rgba(0, 188, 212, 0.4);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 10px rgba(0, 188, 212, 0.2), inset 0 0 4px rgba(0, 188, 212, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Container card refinement */
+.card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(2, 12, 20, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+/* Button enhancements */
+.btn {
+  cursor: pointer;
+  font-weight: 600;
+  border: none;
+  padding: 11px 18px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  transition: all 0.22s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, var(--accent), var(--primary));
+  color: #032;
+  box-shadow: 0 4px 16px rgba(0, 188, 212, 0.25);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 188, 212, 0.35);
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+  border-color: rgba(0, 188, 212, 0.3);
+}
+
+/* Form alignment for desktop & mobile */
+#searchForm {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+    @media(max-width:900px){
+        .card-file {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px;
+  }
+
+  .card-file .meta {
+    margin-right: 0;
+    width: 100%;
+  }
+
+  .card-file .actions {
+    position: static;
+    transform: none;
+    margin-top: 10px;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  #searchForm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .search-field {
+    width: 100%;
+  }
+  .btn-primary, .btn-ghost {
+    width: 100%;
+    text-align: center;
+  }
+    .search-advanced { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .search-advanced input { padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:var(--text); }
+    .badge { background:rgba(255,255,255,0.03); padding:6px 8px; border-radius:8px; font-size:0.9rem; color:var(--text) }
+    .alert { padding:10px 12px; border-radius:8px; margin-bottom:12px; }
+    .alert-success { background:rgba(0,200,120,0.08); color:#adffcc; border:1px solid rgba(0,200,120,0.08); }
+    .alert-error { background:rgba(255,120,120,0.06); color:#ffcccc; border:1px solid rgba(255,120,120,0.06); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div style="display:flex;align-items:center;gap:18px;margin-bottom:18px">
+    <a href="{{ url_for('home') }}"><img src="/static/logo.png" style="width:64px"></a>
+    <div>
+      <div style="font-size:1.1rem;color:var(--primary);font-weight:600">Admin Dashboard</div>
+      <div class="small">Manage stored files — Page {{ page }} of {{ total_pages }}</div>
+    </div>
+    <div style="margin-left:auto; display:flex; gap:8px;">
+      <a class="btn btn-ghost" href="{{ url_for('files_list') }}">View public files</a>
+      <a class="btn btn-ghost" href="{{ url_for('admin_logout') }}">Logout</a>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div id="alertContainer"></div>
+
+    <!-- Simple Search (only q) -->
+    <form id="searchForm" method="get" action="{{ url_for('admin_dashboard') }}" style="display:flex;gap:8px;align-items:center;">
+      <input name="q" placeholder="Search filename or message_id (regex supported)" class="search-field" value="{{ request.args.get('q','')|e }}" style="flex:1">
+      <button class="btn btn-primary" type="submit">Search</button>
+      <button class="btn btn-ghost" type="button" id="clearFilters">Clear</button>
+    </form>
+  </div>
+
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+    <label style="display:flex;gap:8px;align-items:center">
+      <input type="checkbox" id="selectAll"> <span class="small">Select all on page</span>
+    </label>
+    <button id="bulkDeleteBtn" class="btn btn-danger btn-sm" disabled>Delete selected</button>
+    <div id="selectedCount" class="small" style="margin-left:8px">0 selected</div>
+    <div style="margin-left:auto" class="small">Showing {{ files|length }} items (page size {{ per_page }})</div>
+  </div>
+
+ <div class="grid" style="display:flex;flex-direction:column;gap:12px">
+  {% if files %}
+    {% for f in files %}
+      <div class="card-file" data-id="{{ f.get('_id') }}">
+        <!-- Left: checkbox -->
+        <div style="flex: 0 0 auto; margin-right:10px;">
+          <input type="checkbox" class="rowCheckbox" data-id="{{ f.get('_id') }}">
+        </div>
+
+        <!-- Middle: meta (flexes to fill available space) -->
+        <div class="meta">
+          <div style="min-width:0">
+            <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              {{ f.get('file_name','Unnamed File') }}
+            </div>
+            <div class="small" style="margin-top:6px">
+              Message ID: <strong>{{ f.get('message_id') }}</strong>
+              {% if f.get('file_size') %}
+                • Size: <strong>{{ human_readable_size(f.get('file_size')) }}</strong>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: actions (absolutely pinned by your CSS) -->
+        <div class="actions" style="position:absolute; right:8px; top:50%; transform:translateY(-50%);">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('redirect_page') }}?id={{ f.get('message_id') }}" target="_blank">Get</a>
+          <button class="btn btn-sm" onclick="openEdit('{{ f.get('_id') }}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="doDelete('{{ f.get('_id') }}')">Delete</button>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="small" style="padding:18px">No files found for this query.</div>
+  {% endif %}
+</div>
+
+
+  <div style="display:flex;gap:8px;justify-content:center;align-items:center;margin-top:18px">
+    {% if page > 1 %}
+      <a class="btn btn-ghost" href="{{ url_for('admin_dashboard') }}?page={{ page-1 }}{% if request.query_string %}&{{ request.query_string.decode('utf-8') }}{% endif %}">Previous</a>
+    {% else %}
+      <button class="btn btn-ghost" disabled>Previous</button>
+    {% endif %}
+    <div class="small">Page {{ page }} / {{ total_pages }}</div>
+    {% if page < total_pages %}
+      <a class="btn btn-ghost" href="{{ url_for('admin_dashboard') }}?page={{ page+1 }}{% if request.query_string %}&{{ request.query_string.decode('utf-8') }}{% endif %}">Next</a>
+    {% else %}
+      <button class="btn btn-ghost" disabled>Next</button>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Edit modal (unchanged) -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);align-items:center;justify-content:center">
+  <div style="background:var(--card);padding:16px;border-radius:10px;width:min(720px,95%)">
+    <h3>Edit file</h3>
+    <form id="editForm">
+      <input type="hidden" id="edit_id" name="_id">
+      <label>File name</label><br><input id="edit_name" name="file_name" style="width:100%;padding:8px;border-radius:6px"><br>
+      <label>Message ID</label><br><input id="edit_msgid" name="message_id" style="width:100%;padding:8px;border-radius:6px"><br><br>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn btn-ghost" onclick="closeEdit()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* (JS same as earlier — selection, bulk delete, edit, alerts, clear) */
+const selectAll = document.getElementById('selectAll');
+const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+const selectedCount = document.getElementById('selectedCount');
+const alertContainer = document.getElementById('alertContainer');
+
+function getRowCheckboxes(){ return Array.from(document.querySelectorAll('.rowCheckbox')); }
+function getSelectedIds(){ return getRowCheckboxes().filter(cb=>cb.checked).map(cb=>cb.getAttribute('data-id')); }
+function updateSelectionUI(){ const count = getSelectedIds().length; selectedCount.textContent = `${count} selected`; bulkDeleteBtn.disabled = (count === 0); }
+
+selectAll?.addEventListener('change', (e)=>{ const checked = e.target.checked; getRowCheckboxes().forEach(cb => cb.checked = checked); updateSelectionUI(); });
+document.addEventListener('change', (e)=>{ if(e.target && e.target.classList && e.target.classList.contains('rowCheckbox')) updateSelectionUI(); });
+
+bulkDeleteBtn?.addEventListener('click', async ()=>{ const ids = getSelectedIds(); if(!ids.length) return; if(!confirm(`Delete ${ids.length} selected items? This cannot be undone.`)) return; try{ const res = await fetch('/admin/api/files/bulk_delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids }) }); const j = await res.json(); if(j.ok){ showAlert('Deleted '+ (j.deleted_count || ids.length) +' items', 'success'); setTimeout(()=> location.reload(), 800); } else { showAlert(j.error || 'Bulk delete failed', 'error'); } } catch(err){ showAlert(err.message || 'Request failed', 'error'); } });
+
+function openEdit(id){ fetch('/admin/api/file/' + id).then(r=>r.json()).then(j=>{ if(!j.ok){ showAlert(j.error||'Failed','error'); return; } const f = j.file; document.getElementById('edit_id').value = f._id.$oid || f._id; document.getElementById('edit_name').value = f.file_name || ''; document.getElementById('edit_msgid').value = f.message_id || ''; document.getElementById('editModal').style.display = 'flex'; }).catch(e=> showAlert(e.message,'error')); }
+function closeEdit(){ document.getElementById('editModal').style.display = 'none'; }
+document.getElementById('editForm').addEventListener('submit', function(e){ e.preventDefault(); const id = document.getElementById('edit_id').value; const payload = { file_name: document.getElementById('edit_name').value, message_id: document.getElementById('edit_msgid').value }; fetch('/admin/api/file/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }).then(r=>r.json()).then(j=>{ if(j.ok) location.reload(); else showAlert(j.error||'Save failed','error'); }).catch(e=>showAlert(e.message,'error')); });
+
+function doDelete(id){ if(!confirm('Delete this file? This cannot be undone.')) return; fetch('/admin/api/file/' + id, { method:'DELETE' }).then(r=>r.json()).then(j=>{ if(j.ok) location.reload(); else showAlert(j.error||'Delete failed','error'); }); }
+
+function showAlert(msg, kind='success'){ alertContainer.innerHTML = `<div class="alert ${kind==='success'?'alert-success':'alert-error'}">${msg}</div>`; setTimeout(()=>{ if(alertContainer.firstChild) alertContainer.removeChild(alertContainer.firstChild); }, 4000); }
+
+document.getElementById('clearFilters').addEventListener('click', (e)=>{ const f = document.getElementById('searchForm'); Array.from(f.querySelectorAll('input')).forEach(i => { if(i.name!=='q') i.value=''; }); f.querySelector('[name=q]').value=''; f.submit(); });
+</script>
+
+</body>
+</html>
+"""
 
 
 
@@ -751,20 +1117,26 @@ def redirect_page():
         # fallback to bot homepage if no id
         return redirect(f"https://t.me/{BOT_USERNAME}")
 
-    # fetch entry (safe)
+    # safely convert message_id
     try:
         msg_int = int(msg_id)
     except Exception:
         return redirect(f"https://t.me/{BOT_USERNAME}")
 
+    # find the file entry
     file_entry = files_collection.find_one({"message_id": msg_int}) or {}
-    file_name = file_entry.get('file_name') or "Requested File"
+    raw_name = file_entry.get('file_name') or "Requested File"
 
-    return render_template_string(REDIRECT_TEMPLATE,
-                                  msg_id=msg_int,
-                                  bot_username=BOT_USERNAME,
-                                  file_name=file_name)
+    # ✅ Clean the filename before using it
+    file_name = clean_filename(raw_name)
 
+    # render the redirect page
+    return render_template_string(
+        REDIRECT_TEMPLATE,
+        msg_id=msg_int,
+        bot_username=BOT_USERNAME,
+        file_name=file_name
+    )
 @app.route('/files')
 def files_list():
     """
@@ -807,6 +1179,183 @@ def files_list():
                                   total_pages=total_pages,
                                   query=search_q,
                                   bot_username=BOT_USERNAME)
+
+
+
+# ---- auth decorator ----
+def login_required(f):
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        if session.get("admin_logged_in"):
+            return f(*args, **kwargs)
+        return redirect(url_for("admin_login", next=request.path))
+    return wrapped
+
+# ---- routes ----
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    from config import ADMIN_USERNAME, ADMIN_PASSWORD  # ✅ import from config
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session["admin_logged_in"] = True
+            session["admin_username"] = username
+            next_url = request.args.get("next") or url_for("admin_dashboard")
+            return redirect(next_url)
+        else:
+            flash("Invalid username or password")
+
+    return render_template_string(LOGIN_TEMPLATE)
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_logged_in", None)
+    session.pop("admin_username", None)
+    return redirect(url_for("admin_login"))
+
+def human_readable_size(sz):
+    """Return human-readable size. Accepts int or numeric string. Examples: '1.2 MB', '3.45 GB'."""
+    try:
+        s = int(sz)
+    except Exception:
+        try:
+            s = float(sz)
+        except Exception:
+            return str(sz)  # fallback
+
+    if s < 1024:
+        return f"{s} B"
+    if s < 1048576:
+        return f"{s/1024:.1f} KB"
+    if s < 1073741824:
+        return f"{s/1048576:.1f} MB"
+    return f"{s/1073741824:.2f} GB"
+
+@app.route("/admin/dashboard")
+@login_required
+def admin_dashboard():
+    # page param
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except Exception:
+        page = 1
+    per_page = 12
+
+    # Only 'q' is supported now
+    q = request.args.get("q", "").strip()
+
+    mongo_filter = {}
+
+    if q:
+        sub_filters = []
+        if q.isdigit():
+            sub_filters.append({"message_id": int(q)})
+        try:
+            import re
+            if q.startswith('/') and q.endswith('/') and len(q) > 2:
+                pattern = q[1:-1]
+            else:
+                pattern = re.escape(q)
+            sub_filters.append({"file_name": {"$regex": pattern, "$options": "i"}})
+        except Exception:
+            # fallback substring
+            sub_filters.append({"file_name": {"$regex": q, "$options": "i"}})
+
+        mongo_filter["$or"] = sub_filters
+
+    # Count + pagination
+    total_count = files_collection.count_documents(mongo_filter)
+    total_pages = max(1, ceil(total_count / per_page))
+    if page > total_pages:
+        page = total_pages
+    skip = (page - 1) * per_page
+
+    cursor = files_collection.find(mongo_filter).sort("message_id", DESCENDING).skip(skip).limit(per_page)
+    files = list(cursor)
+
+    # pass human_readable_size into template
+    return render_template_string(DASHBOARD_TEMPLATE, files=files, page=page, per_page=per_page, total_pages=total_pages, request=request, human_readable_size=human_readable_size)
+@app.route("/admin/api/files/bulk_delete", methods=["POST"])
+@login_required
+def admin_bulk_delete():
+    data = request.get_json() or {}
+    ids = data.get("ids", [])
+    if not ids:
+        return jsonify({"ok": False, "error": "No ids provided"}), 400
+
+    # Build deletion query that accepts ObjectId or string _id
+    queries = []
+    for i in ids:
+        try:
+            queries.append(ObjectId(i))
+        except Exception:
+            queries.append(i)
+
+    # Delete by matching _id in list
+    res = files_collection.delete_many({"_id": {"$in": queries}})
+    return jsonify({"ok": True, "deleted_count": res.deleted_count})
+
+
+@app.route("/admin/api/file/<id>", methods=["GET", "PUT", "DELETE"])
+@login_required
+def admin_file_api(id):
+    try:
+        oid = ObjectId(id)
+        query = {"_id": oid}
+    except Exception:
+        query = {"_id": id}
+    if request.method == "GET":
+        doc = files_collection.find_one(query)
+        if not doc:
+            return jsonify({"ok": False, "error": "Not found"}), 404
+        doc["_id"] = {"$oid": str(doc["_id"])} if isinstance(doc.get("_id"), ObjectId) else doc["_id"]
+        return jsonify({"ok": True, "file": doc})
+    if request.method == "PUT":
+        data = request.get_json() or {}
+        update = {}
+        if "file_name" in data: update["file_name"] = data["file_name"]
+        if "message_id" in data: update["message_id"] = data["message_id"]
+        if not update:
+            return jsonify({"ok": False, "error": "Nothing to update"}), 400
+        res = files_collection.update_one(query, {"$set": update})
+        if res.modified_count:
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "No changes made or not found"}), 404
+    if request.method == "DELETE":
+        res = files_collection.delete_one(query)
+        if res.deleted_count:
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "Not found"}), 404
+
+# ---- helper to create admin user ----
+def create_admin(username, password):
+    if users_collection is None:
+        raise RuntimeError("users_collection not configured in config.py")
+    if not username or not password:
+        raise ValueError("username & password required")
+    users_collection.update_one({"username": username}, {"$set": {"username": username, "password_hash": generate_password_hash(password)}}, upsert=True)
+    print("Admin user created/updated")
+
+@app.route("/setup", methods=["POST"])
+def setup_route():
+    if os.environ.get("ALLOW_SETUP") != "1":
+        return "setup disabled", 403
+    if users_collection is None:
+        return jsonify({"ok": False, "error": "users_collection missing"}), 500
+    data = request.get_json() or {}
+    username = data.get("username")
+    password = data.get("password")
+    if not username or not password:
+        return jsonify({"ok": False, "error": "username & password required"}), 400
+    create_admin(username, password)
+    return jsonify({"ok": True})
+# -------------------------------------------------------------------------------
+
+
 
 # ---------- Run (flask + your telegram client) ----------
 def run_flask():
