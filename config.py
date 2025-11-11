@@ -25,6 +25,10 @@ UPDATES_CHANNEL = os.getenv("UPDATES_CHANNEL")
 MOVIES_GROUP = os.getenv("MOVIES_GROUP")
 AUTH_CHANNELS = [int(ch.strip()) for ch in os.getenv("AUTH_CHANNELS", "").split(",") if ch.strip()]
 
+# ---------- Admin Credentials ----------
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "batman")  # default: admin
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "batmanjk")  # default: admin
+
 DELETE_AFTER = int(os.getenv("DELETE_AFTER", 1800))
 DELETE_AFTER_FILE = int(os.getenv("DELETE_AFTER_FILE", 1800))
 DELETE_DELAY = int(os.getenv("DELETE_DELAY", 3600))
