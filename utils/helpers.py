@@ -1,4 +1,5 @@
 import asyncio
+import os
 import re
 import urllib.parse
 import socket
@@ -25,7 +26,7 @@ REMOVE_TAGS = [
     r'@Team_5G_', r'@Tamil_Mob_LinksZz', r'@MoviesNowLinks', r'@Movies_Worldda1', r'@Smile_upload',
     r'@mtb_s', r'@Tamil_LinkzZ', r'@SPY_TALKIESS', r'@MOViEZHUNT', r'@SheikXMoviesOffl', r'@Hevc_Mob',
     r'@VideoMemesTamizh', r'@Movies_Graft', r'@THHx265', r'@MoviiWrld', r'@HEVC_Moviesz',
-    r'@TamilDubFilms', r'@CelluloidCineClub', r'@sokfiles', r'@Rarefilms', r'𝙼𝚁✘', r'ꜰᴏ✘'
+    r'@TamilDubFilms', r'@CelluloidCineClub',r'_@UHDPrime', r'@sokfiles', r'@Rarefilms', r'𝙼𝚁✘', r'ꜰᴏ✘'
 ]
 REMOVE_PATTERN = re.compile(
     r'(' + '|'.join(REMOVE_TAGS) + r'|@[\w\d]+(?=[\s_\-\.]|$))',
@@ -34,22 +35,39 @@ REMOVE_PATTERN = re.compile(
 
 def clean_filename(name: str) -> str:
     """Clean filename by removing tags, credits, and junk characters."""
+
+    # Separate base name and extension (so we don't modify the extension)
+    base, ext = os.path.splitext(name)
+
     # Remove known uploader/channel tags
-    name = re.sub(REMOVE_PATTERN, '', name)
+    base = re.sub(REMOVE_PATTERN, '', base)
 
     # Remove leftover "by @..." or "(by ...)"
-    name = re.sub(
-        r'[\(\[\{]?\s*(by|uploaded\s*by)?\s*@[\w\d_]+\s*[\)\]\}]?',
+    base = re.sub(
+        r'[\(\[\{]?\s*(?:by|uploaded\s*by)?\s*@[\w\d_]+\s*[\)\]\}]?',
         '',
-        name,
+        base,
         flags=re.IGNORECASE
     )
 
-    # Clean redundant underscores, dots, and spaces
-    name = re.sub(r'[_\.\-]{2,}', ' ', name)
-    name = re.sub(r'\s{2,}', ' ', name)
-    name = re.sub(r'^[\s._\-\[\]]+|[\s._\-\[\]]+$', '', name).strip()
-    return name
+    # Replace underscores with spaces
+    base = base.replace("_", " ")
+
+    # Replace dots with spaces (but not the one before the extension)
+    base = re.sub(r'\.(?!\w+$)', ' ', base)
+
+    # Remove a leading dash "-" (only if at the start)
+    base = re.sub(r'^-\s*', '', base)
+
+    # Clean redundant dashes, extra spaces
+    base = re.sub(r'[\-]{2,}', ' ', base)
+    base = re.sub(r'\s{2,}', ' ', base)
+
+    # Trim unwanted characters from start and end
+    base = re.sub(r'^[\s.\-\[\]]+|[\s.\-\[\]]+$', '', base).strip()
+
+    # Reattach extension
+    return f"{base}{ext}"
 
 # ------------------ User Utilities ------------------ #
 
