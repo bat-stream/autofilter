@@ -397,45 +397,38 @@ REDIRECT_TEMPLATE = """
   getBtn.addEventListener('click', async (e) => {
     e.preventDefault();
 
-    // Show existing popup ad
+    // Show your existing popup
     popupAd.style.display = 'flex';
 
-    // Wait 1 second before showing AdsGalaxy
-    setTimeout(async () => {
-      popupAd.style.display = 'none';
+    if (typeof window.showAdsGalaxy === 'function') {
+      try {
+        // Show AdsGalaxy and wait for it to finish
+        const result = await window.showAdsGalaxy();
 
-      // Show AdsGalaxy ad
-      if (typeof window.showAdsGalaxy === 'function') {
-        try {
-          const result = await window.showAdsGalaxy();
+        console.log('AdsGalaxy result:', result);
 
-          // Optional: result.request_id can be sent to your backend.
-          // Do not credit a valuable wallet here.
-          console.log('AdsGalaxy result:', result);
+        // Hide your popup after AdsGalaxy finishes
+        popupAd.style.display = 'none';
 
-          // Redirect to Telegram after AdsGalaxy completes
-          window.location.href = fileLink.href;
+        // Then redirect to Telegram
+        window.location.href = fileLink.href;
 
-        } catch (error) {
-          console.log(
-            'AdsGalaxy error:',
-            error.code,
-            error.message
-          );
+      } catch (error) {
+        console.log('AdsGalaxy error:', error.code, error.message);
 
-          // If AdsGalaxy fails, still allow the user to get the file
-          window.location.href = fileLink.href;
-        }
-      } else {
-        // SDK failed/not loaded — continue normally
-        console.log('AdsGalaxy SDK is not available.');
+        // Hide popup and continue to file if the ad fails/closes
+        popupAd.style.display = 'none';
         window.location.href = fileLink.href;
       }
+    } else {
+      console.log('AdsGalaxy SDK is not available.');
 
-    }, 1000);
+      popupAd.style.display = 'none';
+      window.location.href = fileLink.href;
+    }
   });
 
-  // --- Close popup ---
+  // --- Close your popup manually ---
   closeAd.addEventListener('click', () => {
     popupAd.style.display = 'none';
   });
@@ -468,6 +461,7 @@ REDIRECT_TEMPLATE = """
     });
   }
 </script>
+
 
 
 <!-- Footer -->
