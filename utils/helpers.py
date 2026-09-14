@@ -405,16 +405,6 @@ async def send_paginated_files(
 
 
 def get_file_buttons(files, query, page=0, user_id=None):
-    """
-    Build search-result buttons.
-
-    Each file button opens the Telegram Mini App and passes
-    the indexed Telegram message_id as ?file_id=...
-
-    Example:
-        https://your-mini-app.com/?file_id=12345
-    """
-
     total_files = len(files)
 
     start = page * PAGE_SIZE
@@ -424,7 +414,7 @@ def get_file_buttons(files, query, page=0, user_id=None):
 
     buttons = []
 
-    # URL-encode query because it may contain spaces/special characters.
+    # Encode query safely
     encoded_query = urllib.parse.quote(
         query,
         safe=""
@@ -434,13 +424,12 @@ def get_file_buttons(files, query, page=0, user_id=None):
 
         message_id = f.get("message_id")
 
-        # Skip broken database entries
         if not message_id:
             continue
 
-        # --------------------------------------------------
+        # ---------------------------------------------
         # File size
-        # --------------------------------------------------
+        # ---------------------------------------------
 
         file_size = f.get("file_size") or 0
 
@@ -451,9 +440,9 @@ def get_file_buttons(files, query, page=0, user_id=None):
         else:
             size_str = f"{round(size_mb, 2)} MB"
 
-        # --------------------------------------------------
-        # Clean filename
-        # --------------------------------------------------
+        # ---------------------------------------------
+        # Filename
+        # ---------------------------------------------
 
         name = f.get(
             "file_name",
@@ -462,17 +451,13 @@ def get_file_buttons(files, query, page=0, user_id=None):
 
         clean_name_value = clean_filename(name)
 
-        # --------------------------------------------------
+        # ---------------------------------------------
         # Episode information
-        # --------------------------------------------------
+        # ---------------------------------------------
 
         episode_info = extract_season_episode(
             clean_name_value
         )
-
-        # --------------------------------------------------
-        # Button label
-        # --------------------------------------------------
 
         if episode_info:
 
@@ -489,35 +474,32 @@ def get_file_buttons(files, query, page=0, user_id=None):
                 f"{clean_name_value}"
             )
 
-        # --------------------------------------------------
-        # MINI APP URL
-        # --------------------------------------------------
+        # ---------------------------------------------
+        # Telegram Mini App deep link
+        # ---------------------------------------------
 
-        mini_app_url = (
-            f"{MINI_APP_URL}"
-            f"?file_id={message_id}"
+        mini_app_link = (
+            f"https://t.me/"
+            f"{BOT_USERNAME}"
+            f"?startapp=file_{message_id}"
         )
 
-        # --------------------------------------------------
-        # Mini App button
-        # --------------------------------------------------
+        # ---------------------------------------------
+        # NORMAL URL BUTTON
+        # ---------------------------------------------
+        # Do NOT use web_app= here.
+        # This avoids BUTTON_TYPE_INVALID.
 
         buttons.append([
-
             InlineKeyboardButton(
-
                 label,
-
-                web_app=WebAppInfo(
-                    url=mini_app_url
-                )
+                url=mini_app_link
             )
-
         ])
 
-    # ======================================================
-    # PAGINATION
-    # ======================================================
+    # =================================================
+    # Pagination
+    # =================================================
 
     nav = []
 
@@ -526,7 +508,6 @@ def get_file_buttons(files, query, page=0, user_id=None):
         if user_id is not None:
 
             nav.append(
-
                 InlineKeyboardButton(
                     "⬅️ Pʀᴇᴠ",
                     callback_data=(
@@ -535,13 +516,11 @@ def get_file_buttons(files, query, page=0, user_id=None):
                         f"{page - 1}"
                     )
                 )
-
             )
 
         else:
 
             nav.append(
-
                 InlineKeyboardButton(
                     "⬅️ Pʀᴇᴠ",
                     callback_data=(
@@ -549,7 +528,6 @@ def get_file_buttons(files, query, page=0, user_id=None):
                         f"{page - 1}"
                     )
                 )
-
             )
 
     if (page + 1) * PAGE_SIZE < total_files:
@@ -557,7 +535,6 @@ def get_file_buttons(files, query, page=0, user_id=None):
         if user_id is not None:
 
             nav.append(
-
                 InlineKeyboardButton(
                     "Nᴇxᴛ ➡️",
                     callback_data=(
@@ -566,13 +543,11 @@ def get_file_buttons(files, query, page=0, user_id=None):
                         f"{page + 1}"
                     )
                 )
-
             )
 
         else:
 
             nav.append(
-
                 InlineKeyboardButton(
                     "Nᴇxᴛ ➡️",
                     callback_data=(
@@ -580,7 +555,6 @@ def get_file_buttons(files, query, page=0, user_id=None):
                         f"{page + 1}"
                     )
                 )
-
             )
 
     if nav:
@@ -590,6 +564,7 @@ def get_file_buttons(files, query, page=0, user_id=None):
         return None
 
     return InlineKeyboardMarkup(buttons)
+
 
 
 
