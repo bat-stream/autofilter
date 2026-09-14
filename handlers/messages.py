@@ -248,16 +248,19 @@ async def index_list(c: Client, m: Message):
 # ------------------ Private /start ------------------ #
 @client.on_message(filters.command("start") & (filters.private | filters.group))
 async def start(c: Client, m: Message):
+
+    # Save private user
     if m.chat.type == enums.ChatType.PRIVATE:
         await save_user(m.from_user.id)
+
         try:
-          requests.get(
-            "https://app.adsgalaxy.online/api/bot/integration/406/UZ5glD9B24PBhVqyWz0f0JS9whLJxA0D_WpdmK8-vTY",
-            params={"user_id": m.from_user.id},
-            timeout=3
-         )
-       except requests.RequestException:
-          pass
+            requests.get(
+                "https://app.adsgalaxy.online/api/bot/integration/406/UZ5glD9B24PBhVqyWz0f0JS9whLJxA0D_WpdmK8-vTY",
+                params={"user_id": m.from_user.id},
+                timeout=3
+            )
+        except requests.RequestException:
+            pass
 
     args = m.text.split(maxsplit=1)
 
@@ -266,8 +269,8 @@ async def start(c: Client, m: Message):
         try:
             msg_id = int(args[1].split("_")[1])
             await check_sub_and_send_file(c, m, msg_id)
-        except Exception as e:
-            msg = await m.reply(
+         except Exception as e:
+             msg = await m.reply(
                 f"❌ Error:\n<code>{e}</code>",
                 parse_mode=enums.ParseMode.HTML
             )
