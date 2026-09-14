@@ -3,3 +3,4 @@ tgcrypto
 pymongo
 dotenv
 flask
+requests
