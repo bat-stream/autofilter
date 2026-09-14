@@ -8,7 +8,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, 
 from config import (
     client, files_collection, users_collection, LOG_CHANNEL, BASE_URL, 
     DELETE_AFTER_FILE, DELETE_AFTER, DELETE_DELAY_REQ, INDEX_CHANNEL, 
-    AUTH_CHANNELS, GROUP_ID,MINI_APP_URL
+    AUTH_CHANNELS, GROUP_ID,MINI_APP_URL,BOT_USERNAME
 )
 
 REMOVE_TAGS = [
