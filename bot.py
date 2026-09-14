@@ -84,6 +84,7 @@ HOME_TEMPLATE = """
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
   <link rel="icon" type="image/png" href="/static/favicon.png">
+  <script src="https://app.adsgalaxy.online/sdk.js?id=76"></script>
   """ + COMMON_HEAD + """
   <style>
     /* PUBG-like cinematic fade for the logo */
@@ -156,6 +157,7 @@ HOME_TEMPLATE = """
   .site-footer { font-size: 0.82rem; padding: 12px 8px; margin-top: 350px; }
 }
 </style>
+<script>window.showAdsGalaxy();</script>
 
 </body>
 </html>
@@ -165,448 +167,144 @@ HOME_TEMPLATE = """
 
 
 # ---------- REDIRECT TEMPLATE (faster loading bar + top menu + tight ads + popup on click) ----------
-# ---------- REDIRECT TEMPLATE ----------
 REDIRECT_TEMPLATE = """
 <!doctype html>
 <html lang="en">
 <head>
   <title>Iᴀᴍ Bᴀᴛᴍᴀɴ : {{ file_name }}</title>
-
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        integrity="sha512-Qf6gkbhURu0bXFlXN0JjF5U9epVJt5XJkTR3R3aJv1j/lX0XfN6nxCPLQ+7oK93kN6mH/Vp4rX6xgMWTlrLgAQ=="
-        crossorigin="anonymous"
-        referrerpolicy="no-referrer" />
-
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-Qf6gkbhURu0bXFlXN0JjF5U9epVJt5XJkTR3R3aJv1j/lX0XfN6nxCPLQ+7oK93kN6mH/Vp4rX6xgMWTlrLgAQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+  <script src="https://app.adsgalaxy.online/sdk.js?id=76"></script>
   <link rel="icon" type="image/png" href="/static/favicon.ico">
 
   """ + COMMON_HEAD + """
-
   <style>
-    /* =========================
-       Navigation Bar
-       ========================= */
-
+    /* Navigation Bar */
     .top-nav {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 18px;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      background: rgba(0, 0, 0, 0.35);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      z-index: 1000;
-      box-sizing: border-box;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:10px 18px; position:fixed; top:0; left:0; width:100%;
+      background:rgba(0,0,0,0.35); backdrop-filter:blur(10px);
+      border-bottom:1px solid rgba(255,255,255,0.05);
+      z-index:1000;
     }
-
     .top-nav a {
-      color: var(--text);
-      text-decoration: none;
-      margin: 0 8px;
-      font-weight: 500;
-      font-size: 0.95rem;
-      transition: 0.25s;
+      color:var(--text); text-decoration:none; margin:0 8px;
+      font-weight:500; font-size:0.95rem; transition:0.25s;
     }
-
-    .top-nav a:hover {
-      color: var(--primary);
-      text-shadow: 0 0 10px var(--primary);
-    }
-
-    /* =========================
-       Logo
-       ========================= */
+    .top-nav a:hover { color:var(--primary); text-shadow:0 0 10px var(--primary); }
 
     .logo {
-      width: 150px;
-      height: auto;
-      margin: 20px auto 10px auto;
-      display: block;
-
-      filter:
-        drop-shadow(0 0 12px rgba(0, 188, 212, 0.6))
-        drop-shadow(0 0 25px rgba(30, 144, 255, 0.45));
-
-      opacity: 0;
-      transform: scale(1.18);
-
-      animation:
-        pubgFade 3.6s cubic-bezier(.2, .9, .2, 1) forwards;
+      width:150px; height:auto; margin:20px auto 10px auto;
+      filter:drop-shadow(0 0 12px rgba(0,188,212,0.6)) drop-shadow(0 0 25px rgba(30,144,255,0.45));
+      opacity:0; transform:scale(1.18);
+      animation: pubgFade 3.6s cubic-bezier(.2,.9,.2,1) forwards;
     }
 
     @keyframes pubgFade {
-      0% {
-        opacity: 0;
-        transform: scale(1.4);
-        filter: blur(10px);
-      }
-
-      55% {
-        opacity: 1;
-        transform: scale(1.03);
-        filter: blur(2px);
-      }
-
-      100% {
-        opacity: 1;
-        transform: scale(1);
-        filter: blur(0);
-      }
+      0% { opacity:0; transform:scale(1.4); filter:blur(10px); }
+      55%{ opacity:1; transform:scale(1.03); filter:blur(2px); }
+      100%{ opacity:1; transform:scale(1); filter:blur(0); }
     }
-
-    /* =========================
-       Main Card
-       ========================= */
 
     .card-centered {
-      width: 94%;
-      max-width: 760px;
-      margin: 0 auto;
-      text-align: center;
-      padding: 20px 22px;
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      box-sizing: border-box;
+      width:94%; max-width:760px; margin:0 auto; text-align:center;
+      padding:20px 22px; border-radius:14px; border:1px solid rgba(255,255,255,0.04);
     }
 
-    h1 {
-      margin: 6px 0 10px 0;
-      color: var(--primary);
-
-      word-break: break-all;
-      overflow-wrap: anywhere;
-      hyphens: auto;
-    }
+    h1 { 
+        margin:6px 0 10px 0; 
+        color:var(--primary); 
+        word-break: break-all;      /* ✅ break long words anywhere */
+        overflow-wrap: anywhere;    /* ✅ for modern browsers */
+        hyphens: auto;              /* optional: insert hyphens if needed */
+      }
 
     .small {
-      font-size: 0.95rem;
-      color: rgba(230, 247, 251, 0.84);
+        font-size:0.95rem;
+        color:rgba(230,247,251,0.84);
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
 
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
-
-    /* =========================
-       Loading Bar
-       ========================= */
 
     .loading-bar {
-      width: 90%;
-      max-width: 620px;
-      height: 10px;
-
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 999px;
-
-      margin: 14px auto;
-      overflow: hidden;
-
-      border: 1px solid rgba(255, 255, 255, 0.03);
+      width:90%; max-width:620px; height:10px;
+      background:rgba(255,255,255,0.06); border-radius:999px;
+      margin:14px auto; overflow:hidden; border:1px solid rgba(255,255,255,0.03);
     }
 
     .loading-fill {
-      height: 100%;
-      width: 0%;
-
-      background:
-        linear-gradient(
-          90deg,
-          var(--accent),
-          var(--primary)
-        );
-
-      box-shadow:
-        0 6px 26px rgba(30, 144, 255, 0.16);
-
-      border-radius: inherit;
-
+      height:100%; width:0%;
+      background:linear-gradient(90deg,var(--accent),var(--primary));
+      box-shadow:0 6px 26px rgba(30,144,255,0.16);
+      border-radius:inherit;
       animation: fillAnim 3s linear forwards;
     }
 
-    @keyframes fillAnim {
-      from {
-        width: 0%;
-      }
-
-      to {
-        width: 100%;
-      }
-    }
-
-    /* =========================
-       Get File Button
-       ========================= */
+    @keyframes fillAnim { from{width:0%} to{width:100%} }
 
     #getButton {
-      display: none;
-
-      margin-top: 16px;
-      padding: 12px 22px;
-
-      border-radius: 999px;
-      border: none;
-
-      background:
-        linear-gradient(
-          90deg,
-          var(--accent),
-          var(--primary)
-        );
-
-      color: #021;
-      cursor: pointer;
-
-      font-weight: 600;
-
-      box-shadow:
-        0 10px 40px rgba(0, 188, 212, 0.12);
-
-      transition:
-        opacity 0.25s ease,
-        transform 0.25s ease,
-        box-shadow 0.25s ease;
+      display:none; margin-top:16px; padding:12px 22px; border-radius:999px; border:none;
+      background:linear-gradient(90deg,var(--accent),var(--primary));
+      color:#021; cursor:pointer; font-weight:600;
+      box-shadow:0 10px 40px rgba(0,188,212,0.12);
     }
 
-    #getButton:hover {
-      box-shadow:
-        0 12px 45px rgba(0, 188, 212, 0.25);
+  
 
-      transform: translateY(-1px);
-    }
-
-    #getButton:disabled {
-      cursor: wait;
-    }
-
-    #getButton img {
-      width: 16px;
-      height: 16px;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-
-    /* =========================
-       Ad Containers
-       ========================= */
-
+    /* Ad containers (tight spacing near card) */
     .ad-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 6px 0;
+      display:flex; justify-content:center; align-items:center;
+      margin:6px 0;
     }
 
-    /* =========================
-       Old Popup
-       ========================= */
-
+    /* Popup Ad */
     #popupAd {
-      display: none;
-
-      position: fixed;
-      top: 0;
-      left: 0;
-
-      width: 100%;
-      height: 100%;
-
-      background: rgba(0, 0, 0, 0.7);
-
-      z-index: 9999;
-
-      justify-content: center;
-      align-items: center;
-
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;
       animation: fadeIn 0.3s ease forwards;
     }
-
     #popupAd .ad-box {
-      position: relative;
-
-      background: #fff;
-      padding: 10px;
-
-      border-radius: 12px;
-
-      box-shadow:
-        0 0 15px rgba(0, 0, 0, 0.3);
-
-      transform: scale(0.8);
-      opacity: 0;
-
-      animation:
-        zoomIn 0.4s ease forwards;
+      position:relative; background:#fff; padding:10px; border-radius:12px;
+      box-shadow:0 0 15px rgba(0,0,0,0.3);
+      transform:scale(0.8); opacity:0;
+      animation: zoomIn 0.4s ease forwards;
     }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-
-      to {
-        opacity: 1;
-      }
-    }
-
-    @keyframes zoomIn {
-      to {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
+    @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+    @keyframes zoomIn { to{transform:scale(1); opacity:1;} }
 
     #closeAd {
-      position: absolute;
-      top: -25px;
-      right: 8px;
-
-      background: #fff;
-      color: #000;
-
-      border: none;
-      border-radius: 3px;
-
-      cursor: pointer;
-
-      padding: 2px 6px;
-
-      font-weight: bold;
+      position:absolute; top:-25px; right:8px; background:#fff; color:#000;
+      border:none; border-radius:3px; cursor:pointer; padding:2px 6px; font-weight:bold;
     }
 
-    /* =========================
-       Footer
-       ========================= */
-
-    .site-footer {
-      width: 100%;
-
-      padding: 14px 0;
-
-      background: rgba(0, 0, 0, 0.25);
-
-      text-align: center;
-
-      color: rgba(230, 247, 251, 0.7);
-
-      font-size: 0.88rem;
-
-      position: relative;
-      bottom: 0;
-
-      margin-top: 24px;
-
-      border-top:
-        1px solid rgba(255, 255, 255, 0.05);
-
-      backdrop-filter: blur(4px);
-    }
-
-    .site-footer .footer-content {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    .site-footer a {
-      color: var(--primary);
-      text-decoration: none;
-    }
-
-    .site-footer a:hover {
-      text-decoration: underline;
-    }
-
-    /* =========================
-       Mobile
-       ========================= */
-
-    @media (max-width: 600px) {
-
-      .logo {
-        width: 120px;
-        margin-top: 60px;
-      }
-
-      .top-nav {
-        padding: 8px 12px;
-      }
-
-      .top-nav a {
-        font-size: 0.9rem;
-        margin: 0 4px;
-      }
-
-      .ad-container {
-        margin: 4px 0;
-      }
-
-      .site-footer {
-        font-size: 0.82rem;
-        padding: 12px 8px;
-      }
+    @media (max-width:600px) {
+      .logo { width:120px; margin-top:60px; }
+      .top-nav { padding:8px 12px; }
+      .top-nav a { font-size:0.9rem; }
+      .ad-container { margin:4px 0; }
     }
   </style>
 </head>
-
 <body>
-
   <div class="page-bg"></div>
 
-
-  <!-- =========================
-       Top Navigation
-       ========================= -->
-
+  <!-- Top Navigation -->
   <div class="top-nav">
-
     <div>
-
-      <a href="{{ url_for('home') }}">
-        🏠 Home
-      </a>
-
-      <a href="{{ url_for('files_list') }}">
-        📁 Files List
-      </a>
-
-      <a
-        href="https://bat-stream.blogspot.com"
-        target="_blank"
-        rel="noopener noreferrer">
-
-        🎬 Sᴛʀᴇᴀᴍɪɴɢ Wᴇʙsɪᴛᴇ
-
-      </a>
-
-      <a
-        id="backBtn"
-        href="#"
-        style="display:none;">
-
-        ← Bᴀᴄᴋ
-
-      </a>
-
+      <a href="{{ url_for('home') }}">🏠 Home</a>
+      <a href="{{ url_for('files_list') }}">📁 Files List</a>
+      <a href="https://bat-stream.blogspot.com" target="_blank">
+  🎬 Sᴛʀᴇᴀᴍɪɴɢ Wᴇʙsɪᴛᴇ
+</a>
+      <a id="backBtn" href="#" style="display:none;">← Bᴀᴄᴋ</a>
     </div>
-
   </div>
 
-
-  <!-- =========================
-       Top Ad
-       ========================= -->
-
-  <div
-    class="ad-container"
-    style="margin-top:58px;">
-
+  <!-- Top Ad (tight above card) -->
+  <div class="ad-container" style="margin-top:58px;">
     <script type="text/javascript">
-
       atOptions = {
         'key' : 'bf07742ac8514ce05bb75cd85a9bcd6e',
         'format' : 'iframe',
@@ -614,111 +312,40 @@ REDIRECT_TEMPLATE = """
         'width' : 320,
         'params' : {}
       };
-
     </script>
-
-    <script
-      type="text/javascript"
-      src="//www.highperformanceformat.com/bf07742ac8514ce05bb75cd85a9bcd6e/invoke.js">
-    </script>
-
+    <script type="text/javascript" src="//www.highperformanceformat.com/bf07742ac8514ce05bb75cd85a9bcd6e/invoke.js"></script>
   </div>
 
-
-  <!-- =========================
-       Main Card
-       ========================= -->
-
-  <div
-    class="center-full container"
-    aria-live="polite"
-    style="margin-top:0;">
-
+  <!-- Main Card -->
+  <div class="center-full container" aria-live="polite" style="margin-top:0;">
     <div class="card-centered card">
+      <img src="/static/logo.png" class="logo" alt="Logo" />
+      <h1>{{ file_name }}</h1>
+      <div class="small">Pʀᴇᴘᴀʀɪɴɢ ʏᴏᴜʀ ғɪʟᴇ : ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ</div>
 
-      <img
-        src="/static/logo.png"
-        class="logo"
-        alt="Logo" />
-
-
-      <h1>
-        {{ file_name }}
-      </h1>
-
-
-      <div class="small">
-        Pʀᴇᴘᴀʀɪɴɢ ʏᴏᴜʀ ғɪʟᴇ : ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ
+      <div class="loading-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="loading-fill" id="loadingFill"></div>
       </div>
 
-
-      <!-- Loading Bar -->
-
-      <div
-        class="loading-bar"
-        role="progressbar"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        aria-valuenow="0">
-
-        <div
-          class="loading-fill"
-          id="loadingFill">
-        </div>
-
-      </div>
-
-
-      <!-- Telegram File Link -->
-
-      <a
-        id="fileLink"
-        href="https://t.me/{{ bot_username }}?start=file_{{ msg_id }}">
-
-        <button
-          id="getButton"
-          type="button"
-          aria-hidden="true">
-
-          <img
-            src="https://cdn-icons-png.flaticon.com/512/724/724933.png"
-            alt="Download" />
-
+     <a id="fileLink" href="https://t.me/{{ bot_username }}?start=file_{{ msg_id }}">
+        <button id="getButton" aria-hidden="true">
+          <img src="https://cdn-icons-png.flaticon.com/512/724/724933.png" alt="Download" style="width:16px; height:16px; vertical-align:middle; margin-right:6px;">
           Gᴇᴛ Fɪʟᴇ
-
         </button>
-
       </a>
 
 
-      <div
-        class="small"
-        style="
-          margin-top:12px;
-          color:rgba(230,247,251,0.6);
-        ">
-
-        Iғ ᴛʜᴇ ʙᴜᴛᴛᴏɴ ᴅᴏᴇsɴ'ᴛ ᴀᴘᴘᴇᴀʀ
-        ᴀғᴛᴇʀ ᴀ ғᴇᴡ sᴇᴄᴏɴᴅs,
-        ᴛʀʏ ʀᴇғʀᴇsʜɪɴɢ.
-
+      <div class="small" style="margin-top:12px; color:rgba(230,247,251,0.6)">
+        Iғ ᴛʜᴇ ʙᴜᴛᴛᴏɴ ᴅᴏᴇsɴ'ᴛ ᴀᴘᴘᴇᴀʀ ᴀғᴛᴇʀ ᴀ ғᴇᴡ sᴇᴄᴏɴᴅs, ᴛʀʏ ʀᴇғʀᴇsʜɪɴɢ.
       </div>
 
+      
     </div>
-
   </div>
 
-
-  <!-- =========================
-       Bottom Ad
-       ========================= -->
-
-  <div
-    class="ad-container"
-    style="margin-bottom:12px;">
-
+  <!-- Bottom Ad (tight below card) -->
+  <div class="ad-container" style="margin-bottom:12px;">
     <script type="text/javascript">
-
       atOptions = {
         'key' : 'bf07742ac8514ce05bb75cd85a9bcd6e',
         'format' : 'iframe',
@@ -726,35 +353,15 @@ REDIRECT_TEMPLATE = """
         'width' : 320,
         'params' : {}
       };
-
     </script>
-
-    <script
-      type="text/javascript"
-      src="//www.highperformanceformat.com/bf07742ac8514ce05bb75cd85a9bcd6e/invoke.js">
-    </script>
-
+    <script type="text/javascript" src="//www.highperformanceformat.com/bf07742ac8514ce05bb75cd85a9bcd6e/invoke.js"></script>
   </div>
 
-
-  <!-- =========================
-       Existing Popup Ad
-       =========================
-
-       This is kept in the page, but it is NOT
-       triggered by the Get File button.
-  -->
-
+  <!-- Popup Ad -->
   <div id="popupAd">
-
     <div class="ad-box">
-
-      <button id="closeAd">
-        X
-      </button>
-
+      <button id="closeAd">X</button>
       <script type="text/javascript">
-
         atOptions = {
           'key' : '798f099ab777961c4eee87794ca29801',
           'format' : 'iframe',
@@ -762,309 +369,144 @@ REDIRECT_TEMPLATE = """
           'width' : 160,
           'params' : {}
         };
-
       </script>
-
-      <script
-        type="text/javascript"
-        src="//www.highperformanceformat.com/798f099ab777961c4eee87794ca29801/invoke.js">
-      </script>
-
+      <script type="text/javascript" src="//www.highperformanceformat.com/798f099ab777961c4eee87794ca29801/invoke.js"></script>
     </div>
-
   </div>
 
+  <script>window.showAdsGalaxy();</script>
 
-  <!-- =========================
-       AdsGalaxy SDK
-       ========================= -->
+<script>
+  const loadingFill = document.getElementById('loadingFill');
+  const getBtn = document.getElementById('getButton');
+  const popupAd = document.getElementById('popupAd');
+  const closeAd = document.getElementById('closeAd');
+  const fileLink = document.getElementById('fileLink');
 
-  <script
-    src="https://app.adsgalaxy.online/sdk.js?id=76">
-  </script>
+  loadingFill.addEventListener('animationend', () => {
+    getBtn.style.display = 'inline-block';
+    getBtn.style.opacity = 0;
+    getBtn.style.transform = 'translateY(6px)';
 
+    setTimeout(() => {
+      getBtn.style.transition = 'opacity .25s ease, transform .25s ease';
+      getBtn.style.opacity = 1;
+      getBtn.style.transform = 'translateY(0)';
+      getBtn.removeAttribute('aria-hidden');
+    }, 60);
+  });
 
-  <!-- =========================
-       Main JavaScript
-       ========================= -->
+  // --- Get File button ---
+  getBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
 
-  <script>
+    // Show your existing popup
+    popupAd.style.display = 'flex';
 
-    const loadingFill =
-      document.getElementById('loadingFill');
+    if (typeof window.showAdsGalaxy === 'function') {
+      try {
+        // Show AdsGalaxy and wait for it to finish
+        const result = await window.showAdsGalaxy();
 
-    const getBtn =
-      document.getElementById('getButton');
+        console.log('AdsGalaxy result:', result);
 
-    const fileLink =
-      document.getElementById('fileLink');
+        // Hide your popup after AdsGalaxy finishes
+        popupAd.style.display = 'none';
 
-    const popupAd =
-      document.getElementById('popupAd');
+        // Then redirect to Telegram
+        window.location.href = fileLink.href;
 
-    const closeAd =
-      document.getElementById('closeAd');
+      } catch (error) {
+        console.log('AdsGalaxy error:', error.code, error.message);
 
-
-    /* =========================
-       Loading Complete
-       ========================= */
-
-    loadingFill.addEventListener(
-      'animationend',
-      () => {
-
-        getBtn.style.display =
-          'inline-block';
-
-        getBtn.style.opacity = 0;
-
-        getBtn.style.transform =
-          'translateY(6px)';
-
-
-        setTimeout(() => {
-
-          getBtn.style.transition =
-            'opacity .25s ease, transform .25s ease';
-
-          getBtn.style.opacity = 1;
-
-          getBtn.style.transform =
-            'translateY(0)';
-
-          getBtn.removeAttribute(
-            'aria-hidden'
-          );
-
-        }, 60);
-
+        // Hide popup and continue to file if the ad fails/closes
+        popupAd.style.display = 'none';
+        window.location.href = fileLink.href;
       }
-    );
-
-
-    /* =========================
-       GET FILE → ADSGALAXY
-       → TELEGRAM
-       ========================= */
-
-    getBtn.addEventListener(
-      'click',
-      async (e) => {
-
-        e.preventDefault();
-
-
-        /* Prevent double click */
-
-        if (getBtn.disabled) {
-          return;
-        }
-
-        getBtn.disabled = true;
-
-        getBtn.style.opacity = '0.6';
-
-
-        /* Check AdsGalaxy */
-
-        if (
-          typeof window.showAdsGalaxy ===
-          'function'
-        ) {
-
-          try {
-
-            console.log(
-              'Opening AdsGalaxy...'
-            );
-
-
-            /*
-             * Open AdsGalaxy ad.
-             *
-             * The code waits for the
-             * AdsGalaxy promise to resolve.
-             */
-
-            const result =
-              await window.showAdsGalaxy();
-
-
-            console.log(
-              'AdsGalaxy result:',
-              result
-            );
-
-
-            /*
-             * AdsGalaxy completed.
-             * Now open Telegram.
-             */
-
-            window.location.href =
-              fileLink.href;
-
-
-          } catch (error) {
-
-            console.log(
-              'AdsGalaxy error:',
-              error
-            );
-
-
-            /*
-             * If the ad fails or is unavailable,
-             * still allow the user to get the file.
-             */
-
-            window.location.href =
-              fileLink.href;
-
-          }
-
-        } else {
-
-          console.log(
-            'AdsGalaxy SDK is not available.'
-          );
-
-
-          /*
-           * SDK unavailable.
-           * Continue to Telegram.
-           */
-
-          window.location.href =
-            fileLink.href;
-
-        }
-
-      }
-    );
-
-
-    /* =========================
-       Existing Popup Close
-       ========================= */
-
-    closeAd.addEventListener(
-      'click',
-      () => {
-
-        popupAd.style.display =
-          'none';
-
-      }
-    );
-
-
-    /* =========================
-       Disable Context Menu
-       ========================= */
-
-    document.addEventListener(
-      'contextmenu',
-      e => e.preventDefault()
-    );
-
-
-    /* =========================
-       Disable Some Keyboard
-       Shortcuts
-       ========================= */
-
-    document.addEventListener(
-      'keydown',
-      e => {
-
-        if (
-
-          e.key === 'F12' ||
-
-          (
-            (e.ctrlKey || e.metaKey) &&
-
-            (
-              ['U', 'S', 'P']
-                .includes(
-                  e.key.toUpperCase()
-                ) ||
-
-              (
-                e.shiftKey &&
-
-                ['I', 'J', 'C', 'K']
-                  .includes(
-                    e.key.toUpperCase()
-                  )
-              )
-            )
-          )
-
-        ) {
-
-          e.preventDefault();
-
-        }
-
-      }
-    );
-
-
-    /* =========================
-       Back Button
-       ========================= */
-
-    const backBtn =
-      document.getElementById('backBtn');
-
-
-    if (
-      document.referrer.includes('/files')
-    ) {
-
-      backBtn.style.display =
-        'inline-block';
-
-
-      backBtn.addEventListener(
-        'click',
-        (e) => {
-
-          e.preventDefault();
-
-          window.history.back();
-
-        }
-      );
-
+    } else {
+      console.log('AdsGalaxy SDK is not available.');
+
+      popupAd.style.display = 'none';
+      window.location.href = fileLink.href;
     }
+  });
 
-  </script>
+  // --- Close your popup manually ---
+  closeAd.addEventListener('click', () => {
+    popupAd.style.display = 'none';
+  });
+
+  // Disable context menu & inspect
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  document.addEventListener('keydown', e => {
+    if (
+      e.key === 'F12' ||
+      ((e.ctrlKey || e.metaKey) &&
+        (
+          ['U', 'S', 'P'].includes(e.key.toUpperCase()) ||
+          (e.shiftKey && ['I', 'J', 'C', 'K'].includes(e.key.toUpperCase()))
+        ))
+    ) {
+      e.preventDefault();
+    }
+  });
+
+  // --- Show Back button only if came from files list ---
+  const backBtn = document.getElementById('backBtn');
+
+  if (document.referrer.includes('/files')) {
+    backBtn.style.display = 'inline-block';
+
+    backBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.history.back();
+    });
+  }
+</script>
 
 
-  <!-- =========================
-       Footer
-       ========================= -->
 
-  <footer class="site-footer">
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="footer-content">
+    © 2025 IAmBatman. All Rights Reserved.
+  </div>
+</footer>
 
-    <div class="footer-content">
-
-      © 2025 IAmBatman.
-      All Rights Reserved.
-
-    </div>
-
-  </footer>
-
+<style>
+.site-footer {
+  width: 100%;
+  padding: 14px 0;
+  background: rgba(0, 0, 0, 0.25);
+  text-align: center;
+  color: rgba(230, 247, 251, 0.7);
+  font-size: 0.88rem;
+  position: relative;
+  bottom: 0;
+  margin-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+}
+.site-footer .footer-content {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.site-footer a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+}
+@media(max-width:600px){
+  .site-footer { font-size: 0.82rem; padding: 12px 8px; }
+}
+</style>
 
 </body>
 </html>
 """
-
 
 
 
@@ -1077,6 +519,7 @@ FILES_TEMPLATE = """
   <title>Sᴛᴏʀᴇᴅ Fɪʟᴇs : page {{ page }}{% if query %} (search: {{ query }}){% endif %}</title>
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+  <script src="https://app.adsgalaxy.online/sdk.js?id=76"></script>
   <link rel="icon" type="image/png" href="/static/favicon.png">
   """ + COMMON_HEAD + """
   <style>
@@ -1342,6 +785,10 @@ FILES_TEMPLATE = """
   .site-footer { font-size: 0.82rem; padding: 12px 8px; }
 }
 </style>
+
+<script>
+  window.showAdsGalaxy();
+</script>
 
 </body>
 </html>
