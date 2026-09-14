@@ -250,13 +250,13 @@ async def start(c: Client, m: Message):
     if m.chat.type == enums.ChatType.PRIVATE:
         await save_user(m.from_user.id)
         try:
-        requests.get(
+          requests.get(
             "https://app.adsgalaxy.online/api/bot/integration/406/UZ5glD9B24PBhVqyWz0f0JS9whLJxA0D_WpdmK8-vTY",
             params={"user_id": m.from_user.id},
             timeout=3
-        )
-    except requests.RequestException:
-        pass
+         )
+       except requests.RequestException:
+          pass
 
     args = m.text.split(maxsplit=1)
 
