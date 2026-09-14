@@ -404,48 +404,193 @@ async def send_paginated_files(
 
 
 
-def get_file_buttons(files, query, page):
+def get_file_buttons(files, query, page=0, user_id=None):
+    """
+    Build search-result buttons.
+
+    Each file button opens the Telegram Mini App and passes
+    the indexed Telegram message_id as ?file_id=...
+
+    Example:
+        https://your-mini-app.com/?file_id=12345
+    """
+
     total_files = len(files)
+
     start = page * PAGE_SIZE
     end = min(start + PAGE_SIZE, total_files)
+
     current_files = files[start:end]
+
     buttons = []
 
-    encoded_query = urllib.parse.quote(query)
+    # URL-encode query because it may contain spaces/special characters.
+    encoded_query = urllib.parse.quote(
+        query,
+        safe=""
+    )
 
     for f in current_files:
-        file_size = f.get("file_size", 0)
-        # ✅ Auto-format size: show in GB if >= 1024 MB
+
+        message_id = f.get("message_id")
+
+        # Skip broken database entries
+        if not message_id:
+            continue
+
+        # --------------------------------------------------
+        # File size
+        # --------------------------------------------------
+
+        file_size = f.get("file_size") or 0
+
         size_mb = file_size / (1024 * 1024)
+
         if size_mb >= 1024:
             size_str = f"{round(size_mb / 1024, 2)} GB"
         else:
             size_str = f"{round(size_mb, 2)} MB"
 
-        name = f["file_name"]
-        clean_name = clean_filename(name)
-        episode_info = extract_season_episode(clean_name)
+        # --------------------------------------------------
+        # Clean filename
+        # --------------------------------------------------
 
-        # ✅ Build label
+        name = f.get(
+            "file_name",
+            "Unknown File"
+        )
+
+        clean_name_value = clean_filename(name)
+
+        # --------------------------------------------------
+        # Episode information
+        # --------------------------------------------------
+
+        episode_info = extract_season_episode(
+            clean_name_value
+        )
+
+        # --------------------------------------------------
+        # Button label
+        # --------------------------------------------------
+
         if episode_info:
-            label = f"🎞 {size_str} | {episode_info} | {clean_name}"
+
+            label = (
+                f"🎞 {size_str} | "
+                f"{episode_info} | "
+                f"{clean_name_value}"
+            )
+
         else:
-            label = f"🎞 {size_str} | {clean_name}"
+
+            label = (
+                f"🎞 {size_str} | "
+                f"{clean_name_value}"
+            )
+
+        # --------------------------------------------------
+        # MINI APP URL
+        # --------------------------------------------------
+
+        mini_app_url = (
+            f"{MINI_APP_URL}"
+            f"?file_id={message_id}"
+        )
+
+        # --------------------------------------------------
+        # Mini App button
+        # --------------------------------------------------
 
         buttons.append([
-            InlineKeyboardButton(label, url=f"{BASE_URL}/redirect?id={f['message_id']}")
+
+            InlineKeyboardButton(
+
+                label,
+
+                web_app=WebAppInfo(
+                    url=mini_app_url
+                )
+            )
+
         ])
 
-    # ✅ Pagination
+    # ======================================================
+    # PAGINATION
+    # ======================================================
+
     nav = []
+
     if page > 0:
-        nav.append(InlineKeyboardButton("⬅️ Pʀᴇᴠ", callback_data=f"page_{encoded_query}_{page - 1}"))
+
+        if user_id is not None:
+
+            nav.append(
+
+                InlineKeyboardButton(
+                    "⬅️ Pʀᴇᴠ",
+                    callback_data=(
+                        f"nav:{user_id}|"
+                        f"{encoded_query}:"
+                        f"{page - 1}"
+                    )
+                )
+
+            )
+
+        else:
+
+            nav.append(
+
+                InlineKeyboardButton(
+                    "⬅️ Pʀᴇᴠ",
+                    callback_data=(
+                        f"page_{encoded_query}_"
+                        f"{page - 1}"
+                    )
+                )
+
+            )
+
     if (page + 1) * PAGE_SIZE < total_files:
-        nav.append(InlineKeyboardButton("Nᴇxᴛ ➡️", callback_data=f"page_{encoded_query}_{page + 1}"))
+
+        if user_id is not None:
+
+            nav.append(
+
+                InlineKeyboardButton(
+                    "Nᴇxᴛ ➡️",
+                    callback_data=(
+                        f"nav:{user_id}|"
+                        f"{encoded_query}:"
+                        f"{page + 1}"
+                    )
+                )
+
+            )
+
+        else:
+
+            nav.append(
+
+                InlineKeyboardButton(
+                    "Nᴇxᴛ ➡️",
+                    callback_data=(
+                        f"page_{encoded_query}_"
+                        f"{page + 1}"
+                    )
+                )
+
+            )
+
     if nav:
         buttons.append(nav)
 
+    if not buttons:
+        return None
+
     return InlineKeyboardMarkup(buttons)
+
 
 
 
