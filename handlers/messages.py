@@ -318,7 +318,13 @@ async def start(c: Client, m: Message):
             )
             return
 
-        markup = get_file_buttons(results, query, 0)
+        markup = get_file_buttons(
+            results,
+            query,
+            0,
+            m.from_user.id
+        )
+
 
         msg = await m.reply(
             f"🔍 Search results for <b>{query}</b>:",
