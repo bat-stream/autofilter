@@ -479,23 +479,17 @@ def get_file_buttons(files, query, page=0, user_id=None):
         # ---------------------------------------------
 
         mini_app_link = (
-            f"https://t.me/"
-            f"{BOT_USERNAME}"
+            f"https://t.me/{BOT_USERNAME}"
             f"?startapp=file_{message_id}"
         )
-
-        # ---------------------------------------------
-        # NORMAL URL BUTTON
-        # ---------------------------------------------
-        # Do NOT use web_app= here.
-        # This avoids BUTTON_TYPE_INVALID.
-
+        
         buttons.append([
             InlineKeyboardButton(
                 label,
                 url=mini_app_link
             )
         ])
+
 
     # =================================================
     # Pagination
