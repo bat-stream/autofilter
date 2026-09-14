@@ -371,6 +371,8 @@ REDIRECT_TEMPLATE = """
     </div>
   </div>
 
+<script src="https://app.adsgalaxy.online/sdk.js?id=76"></script>
+
 <script>
   const loadingFill = document.getElementById('loadingFill');
   const getBtn = document.getElementById('getButton');
@@ -382,7 +384,8 @@ REDIRECT_TEMPLATE = """
     getBtn.style.display = 'inline-block';
     getBtn.style.opacity = 0;
     getBtn.style.transform = 'translateY(6px)';
-    setTimeout(()=> {
+
+    setTimeout(() => {
       getBtn.style.transition = 'opacity .25s ease, transform .25s ease';
       getBtn.style.opacity = 1;
       getBtn.style.transform = 'translateY(0)';
@@ -390,39 +393,82 @@ REDIRECT_TEMPLATE = """
     }, 60);
   });
 
-  // --- Popup on click ---
-  getBtn.addEventListener('click', (e) => {
+  // --- Get File button ---
+  getBtn.addEventListener('click', async (e) => {
     e.preventDefault();
+
+    // Show existing popup ad
     popupAd.style.display = 'flex';
-    setTimeout(() => {
+
+    // Wait 1 second before showing AdsGalaxy
+    setTimeout(async () => {
       popupAd.style.display = 'none';
-      window.location.href = fileLink.href;
+
+      // Show AdsGalaxy ad
+      if (typeof window.showAdsGalaxy === 'function') {
+        try {
+          const result = await window.showAdsGalaxy();
+
+          // Optional: result.request_id can be sent to your backend.
+          // Do not credit a valuable wallet here.
+          console.log('AdsGalaxy result:', result);
+
+          // Redirect to Telegram after AdsGalaxy completes
+          window.location.href = fileLink.href;
+
+        } catch (error) {
+          console.log(
+            'AdsGalaxy error:',
+            error.code,
+            error.message
+          );
+
+          // If AdsGalaxy fails, still allow the user to get the file
+          window.location.href = fileLink.href;
+        }
+      } else {
+        // SDK failed/not loaded — continue normally
+        console.log('AdsGalaxy SDK is not available.');
+        window.location.href = fileLink.href;
+      }
+
     }, 1000);
   });
 
+  // --- Close popup ---
   closeAd.addEventListener('click', () => {
     popupAd.style.display = 'none';
   });
 
   // Disable context menu & inspect
   document.addEventListener('contextmenu', e => e.preventDefault());
+
   document.addEventListener('keydown', e => {
-    if (e.key === 'F12' || (e.ctrlKey || e.metaKey) &&
-      (['U','S','P'].includes(e.key.toUpperCase()) ||
-      (e.shiftKey && ['I','J','C','K'].includes(e.key.toUpperCase()))))
+    if (
+      e.key === 'F12' ||
+      ((e.ctrlKey || e.metaKey) &&
+        (
+          ['U', 'S', 'P'].includes(e.key.toUpperCase()) ||
+          (e.shiftKey && ['I', 'J', 'C', 'K'].includes(e.key.toUpperCase()))
+        ))
+    ) {
       e.preventDefault();
+    }
   });
 
   // --- Show Back button only if came from files list ---
   const backBtn = document.getElementById('backBtn');
+
   if (document.referrer.includes('/files')) {
     backBtn.style.display = 'inline-block';
+
     backBtn.addEventListener('click', (e) => {
       e.preventDefault();
       window.history.back();
     });
   }
 </script>
+
 
 <!-- Footer -->
 <footer class="site-footer">
