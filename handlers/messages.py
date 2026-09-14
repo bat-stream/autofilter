@@ -264,67 +264,128 @@ async def start(c: Client, m: Message):
 
     args = m.text.split(maxsplit=1)
 
-    # Deep link with file
-    if len(args) > 1 and args[1].startswith("file_") and m.chat.type == enums.ChatType.PRIVATE:
+    # ------------------ Deep link with file ------------------ #
+    if (
+        len(args) > 1
+        and args[1].startswith("file_")
+        and m.chat.type == enums.ChatType.PRIVATE
+    ):
         try:
-            msg_id = int(args[1].split("_")[1])
+            msg_id = int(args[1].split("_", 1)[1])
             await check_sub_and_send_file(c, m, msg_id)
-         except Exception as e:
-             msg = await m.reply(
+
+        except Exception as e:
+            msg = await m.reply(
                 f"❌ Error:\n<code>{e}</code>",
                 parse_mode=enums.ParseMode.HTML
             )
-            asyncio.create_task(delete_after_delay(msg, DELETE_AFTER))
+            asyncio.create_task(
+                delete_after_delay(msg, DELETE_AFTER)
+            )
+
         return
 
-    # Deep link with search
-    if len(args) > 1 and args[1].startswith("search_") and m.chat.type == enums.ChatType.PRIVATE:
-        query = args[1].replace("search_", "").replace("_", " ").strip()
+    # ------------------ Deep link with search ------------------ #
+    if (
+        len(args) > 1
+        and args[1].startswith("search_")
+        and m.chat.type == enums.ChatType.PRIVATE
+    ):
+        query = (
+            args[1]
+            .replace("search_", "", 1)
+            .replace("_", " ")
+            .strip()
+        )
 
         keywords = re.split(r"\s+", query)
         regex_pattern = ".*".join(map(re.escape, keywords))
         regex = re.compile(regex_pattern, re.IGNORECASE)
 
-        results = list(files_collection.find({"file_name": {"$regex": regex}}))
+        results = list(
+            files_collection.find(
+                {"file_name": {"$regex": regex}}
+            )
+        )
 
         if not results:
             msg = await m.reply(
                 f"❗️No results found for <b>{query}</b>",
                 parse_mode=enums.ParseMode.HTML
             )
-            asyncio.create_task(delete_after_delay(msg, DELETE_AFTER))
+            asyncio.create_task(
+                delete_after_delay(msg, DELETE_AFTER)
+            )
             return
 
         markup = get_file_buttons(results, query, 0)
+
         msg = await m.reply(
             f"🔍 Search results for <b>{query}</b>:",
             reply_markup=markup,
             parse_mode=enums.ParseMode.HTML
         )
-        asyncio.create_task(delete_after_delay(msg, DELETE_AFTER))
+
+        asyncio.create_task(
+            delete_after_delay(msg, DELETE_AFTER)
+        )
+
         return
 
-    # Default welcome
+    # ------------------ Default welcome ------------------ #
     name = m.from_user.first_name if m.from_user else "User"
 
-    # Private: show WebApp button (opens inside Telegram)
+    # ------------------ Private keyboard ------------------ #
     if m.chat.type == enums.ChatType.PRIVATE:
+
         keyboard = InlineKeyboardMarkup([
-            [ InlineKeyboardButton("🚀 Oᴘᴇɴ Mɪɴɪ Aᴘᴘ", web_app=WebAppInfo(url=MINI_APP_URL)) ],
-            [ InlineKeyboardButton("📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ", url=UPDATES_CHANNEL),
-              InlineKeyboardButton("Hᴇʟᴘ❓", callback_data="help_info") ],
-            [ InlineKeyboardButton("🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ", url=MOVIES_GROUP) ]
-        ])
-    else:
-        # Group: don't show web_app button (it may not behave well in groups),
-        # show link to bot or channel instead
-        keyboard = InlineKeyboardMarkup([
-            [ InlineKeyboardButton("🚀 Oᴘᴇɴ Mɪɴɪ Aᴘᴘ", web_app=WebAppInfo(url=MINI_APP_URL)) ],
-            [ InlineKeyboardButton("📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ", url=UPDATES_CHANNEL),
-              InlineKeyboardButton("Hᴇʟᴘ❓", callback_data="help_info") ],
-            [ InlineKeyboardButton("🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ", url=MOVIES_GROUP) ],
+            [
+                InlineKeyboardButton(
+                    "🚀 Oᴘᴇɴ Mɪɴɪ Aᴘᴘ",
+                    web_app=WebAppInfo(url=MINI_APP_URL)
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ",
+                    url=UPDATES_CHANNEL
+                ),
+                InlineKeyboardButton(
+                    "Hᴇʟᴘ❓",
+                    callback_data="help_info"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ",
+                    url=MOVIES_GROUP
+                )
+            ]
         ])
 
+    # ------------------ Group keyboard ------------------ #
+    else:
+
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ",
+                    url=UPDATES_CHANNEL
+                ),
+                InlineKeyboardButton(
+                    "Hᴇʟᴘ❓",
+                    callback_data="help_info"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ",
+                    url=MOVIES_GROUP
+                )
+            ]
+        ])
+
+    # ------------------ Welcome message ------------------ #
     msg = await m.reply_text(
         f"<b>😎 ʜᴇʏ {name},</b>\n\n"
         "<b>ɪ ᴀᴍ Bᴀᴛᴍᴀɴ</b>\n\n"
@@ -337,8 +398,9 @@ async def start(c: Client, m: Message):
 
     # Auto-delete welcome in groups only
     if m.chat.type != enums.ChatType.PRIVATE:
-        asyncio.create_task(delete_after_delay(msg, DELETE_AFTER))
-
+        asyncio.create_task(
+            delete_after_delay(msg, DELETE_AFTER)
+        )
 
 
 
