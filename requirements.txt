@@ -1,6 +1,7 @@
 pyrogram==2.0.106
-tgcrypto
-pymongo
-dotenv
-flask
-requests
+tgcrypto==1.2.5
+pymongo==4.9.2
+python-dotenv==1.0.1
+flask==3.0.3
+requests==2.32.3
+waitress==3.0.0

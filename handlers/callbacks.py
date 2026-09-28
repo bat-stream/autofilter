@@ -1,11 +1,21 @@
 from pyrogram import Client, filters, enums
-from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton,WebAppInfo
-from config import client, files_collection, INDEX_CHANNEL, BASE_URL,MINI_APP_URL, DELETE_AFTER, DELETE_AFTER_FILE, AUTH_CHANNELS,UPDATES_CHANNEL, MOVIES_GROUP,BOT_USERNAME
-from utils.helpers import save_user,get_file_buttons,build_index_page,get_not_joined_channels,delete_after_delay,check_sub_and_send_file,send_paginated_files
-import asyncio, re
+from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from pyrogram.errors import MessageNotModified
-import urllib.parse
+from config import (
+    client, files_collection, INDEX_CHANNEL, BASE_URL, MINI_APP_URL,
+    DELETE_AFTER, DELETE_AFTER_FILE, AUTH_CHANNELS, UPDATES_CHANNEL,
+    MOVIES_GROUP, BOT_USERNAME, PAGE_SIZE,
+)
+from utils.helpers import (
+    save_user, get_file_buttons, build_index_page, get_not_joined_channels,
+    delete_after_delay, check_sub_and_send_file, send_paginated_files,
+    build_search_regex, build_custom_caption, fetch_index_page, resolve_query_token,
+)
+import asyncio
+import re
 import math
+import urllib.parse
+
 
 # Close index
 @client.on_callback_query(filters.regex("close_index"))
@@ -16,6 +26,7 @@ async def close_index_handler(_, cb: CallbackQuery):
     except Exception:
         await cb.answer("❌ Couldn't close.", show_alert=True)
 
+
 @client.on_callback_query(filters.regex(r"^nav:(\d+)\|(.+):(\d+)$"))
 async def handle_pagination_nav(c: Client, query: CallbackQuery):
     try:
@@ -24,12 +35,10 @@ async def handle_pagination_nav(c: Client, query: CallbackQuery):
             return await query.answer("Invalid navigation.")
 
         user_id = int(match.group(1))
-        filename_query = match.group(2)
+        filename_query = resolve_query_token(match.group(2))
         page = int(match.group(3))
 
-        keywords = re.split(r"\s+", filename_query)
-        regex_pattern = ".*".join(map(re.escape, keywords))
-        regex = re.compile(regex_pattern, re.IGNORECASE)
+        regex = build_search_regex(filename_query)
         matching_files = list(files_collection.find({"file_name": {"$regex": regex}}))
 
         await send_paginated_files(c, user_id, matching_files, page, filename_query, query)
@@ -37,21 +46,18 @@ async def handle_pagination_nav(c: Client, query: CallbackQuery):
     except Exception as e:
         await query.answer(f"❌ Error: {e}", show_alert=True)
 
-@client.on_callback_query(filters.regex(r"^indexpage_(\d+)$"))
+
+@client.on_callback_query(filters.regex(r"^indexpage_(\d+)(?:_(\w+))?$"))
 async def paginate_index(c: Client, cb: CallbackQuery):
     page = int(cb.matches[0].group(1))
-    files = list(files_collection.find().sort("file_name", 1))
+    token = cb.matches[0].group(2) or "all"
+    query = resolve_query_token(token)
 
-    if not files:
+    result = fetch_index_page(query, page)
+    if not result:
         return await cb.answer("❌ No indexed files.", show_alert=True)
 
-    # Clean file names before passing to build_index_page
-    for f in files:
-        file_name = f.get('file_name') or ''
-        f['clean_name'] = re.sub(r'^@[^_\s-]+[_\s-]*', '', file_name).strip()
-
-    text, buttons = build_index_page(files, page)
-
+    text, buttons = result
     try:
         await cb.message.edit_text(
             text,
@@ -60,9 +66,11 @@ async def paginate_index(c: Client, cb: CallbackQuery):
             disable_web_page_preview=True
         )
         await cb.answer()
+    except MessageNotModified:
+        await cb.answer()
     except Exception as e:
+        print(f"[ERROR] paginate_index: {e}")
         await cb.answer("⚠️ Couldn't update.", show_alert=True)
-
 
 
 @client.on_callback_query(filters.regex(r"^retry_"))
@@ -72,12 +80,10 @@ async def retry_after_join(c: Client, cb: CallbackQuery):
     not_joined = await get_not_joined_channels(cb.from_user.id)
 
     if not not_joined:
-        # ✅ Joined all channels — send file
         await cb.message.delete()
-        await check_sub_and_send_file(c, cb.message, msg_id)
+        await check_sub_and_send_file(c, cb.message, msg_id, user_id=cb.from_user.id)
         return
 
-    # ❌ Still missing some channels
     join_buttons = []
     for channel_id in not_joined:
         try:
@@ -103,8 +109,8 @@ async def retry_after_join(c: Client, cb: CallbackQuery):
             parse_mode=enums.ParseMode.HTML
         )
     except MessageNotModified:
-        # Ignore harmless "message not modified" errors
         await cb.answer("⚠️ Please join all remaining channels first!", show_alert=True)
+
 
 # ---------------- Help callback ----------------
 @client.on_callback_query(filters.regex("help_info"))
@@ -122,15 +128,14 @@ async def help_callback(_, cb: CallbackQuery):
     )
     await cb.answer()
 
+
 # ---------------- Back to start ----------------
 @client.on_callback_query(filters.regex("start_back"))
 async def back_to_start(_, cb: CallbackQuery):
-    # Call the shared start logic
     msg = cb.message
     chat_type = msg.chat.type
     user_name = cb.from_user.first_name if cb.from_user else "User"
 
-    # Save user if private
     if chat_type == enums.ChatType.PRIVATE:
         await save_user(cb.from_user.id)
 
@@ -143,31 +148,40 @@ async def back_to_start(_, cb: CallbackQuery):
     )
 
     markup = InlineKeyboardMarkup([
-        [ InlineKeyboardButton("🚀 Oᴘᴇɴ Mɪɴɪ Aᴘᴘ", web_app=WebAppInfo(url=MINI_APP_URL)) ],
-            [ InlineKeyboardButton("📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ", url=UPDATES_CHANNEL),
-              InlineKeyboardButton("Hᴇʟᴘ❓", callback_data="help_info") ],
-            [ InlineKeyboardButton("🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ", url=MOVIES_GROUP) ]
+        [InlineKeyboardButton("🚀 Oᴘᴇɴ Mɪɴɪ Aᴘᴘ", web_app=WebAppInfo(url=MINI_APP_URL))],
+        [
+            InlineKeyboardButton("📢 Uᴘᴅᴀᴛᴇs Cʜᴀɴɴᴇʟ", url=UPDATES_CHANNEL),
+            InlineKeyboardButton("Hᴇʟᴘ❓", callback_data="help_info"),
+        ],
+        [InlineKeyboardButton("🎬 Mᴏᴠɪᴇ Sᴇᴀʀᴄʜ Gʀᴏᴜᴘ", url=MOVIES_GROUP)],
     ])
 
-    await msg.edit_text(
-        start_text,
-        reply_markup=markup,
-        parse_mode=enums.ParseMode.HTML
-    )
+    try:
+        await msg.edit_text(start_text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
+    except MessageNotModified:
+        pass
 
-    # Auto-delete in groups
     if chat_type != enums.ChatType.PRIVATE:
         asyncio.create_task(delete_after_delay(msg, DELETE_AFTER))
 
     await cb.answer()
 
+
 @client.on_callback_query(filters.regex(r"^get_(\d+)$"))
 async def resend_file(c: Client, cb: CallbackQuery):
+    """
+    Resend a file with a fresh custom caption.
+
+    FIXED: this previously called an undefined `build_custom_caption()` and
+    used the invalid expression `caption=By @BatmanLinkz` (an unquoted string —
+    Python parsed "By @ BatmanLinkz" as matrix-multiplying two undefined
+    names). Both raised NameError at runtime, so this callback always failed
+    silently with "❌ Failed to resend."
+    """
     msg_id = int(cb.matches[0].group(1))
     try:
         original = await c.get_messages(chat_id=INDEX_CHANNEL, message_ids=msg_id)
 
-        # Extract file or caption
         file_obj = None
         if original.document:
             file_obj = original.document.file_id
@@ -176,7 +190,6 @@ async def resend_file(c: Client, cb: CallbackQuery):
         elif original.audio:
             file_obj = original.audio.file_id
 
-        # Get file name or fallback to caption
         file_name = (
             getattr(original.document, "file_name", None)
             or getattr(original.video, "file_name", None)
@@ -185,42 +198,30 @@ async def resend_file(c: Client, cb: CallbackQuery):
             or "File"
         )
 
-        # Build custom caption
         caption = build_custom_caption(file_name)
 
-        # Send file with custom caption
         if original.document:
             sent = await c.send_document(
-                chat_id=cb.message.chat.id,
-                document=file_obj,
-                caption=By @BatmanLinkz,
-                parse_mode=enums.ParseMode.HTML
+                chat_id=cb.message.chat.id, document=file_obj,
+                caption=caption, parse_mode=enums.ParseMode.HTML
             )
         elif original.video:
             sent = await c.send_video(
-                chat_id=cb.message.chat.id,
-                video=file_obj,
-                caption=caption,
-                parse_mode=enums.ParseMode.HTML
+                chat_id=cb.message.chat.id, video=file_obj,
+                caption=caption, parse_mode=enums.ParseMode.HTML
             )
         elif original.audio:
             sent = await c.send_audio(
-                chat_id=cb.message.chat.id,
-                audio=file_obj,
-                caption=By @BatmanLinkz,
-                parse_mode=enums.ParseMode.HTML
+                chat_id=cb.message.chat.id, audio=file_obj,
+                caption=caption, parse_mode=enums.ParseMode.HTML
             )
         else:
-            # fallback: copy message
             sent = await c.copy_message(
-                chat_id=cb.message.chat.id,
-                from_chat_id=INDEX_CHANNEL,
-                message_id=msg_id
+                chat_id=cb.message.chat.id, from_chat_id=INDEX_CHANNEL, message_id=msg_id
             )
 
         await cb.answer("📥 File sent with custom caption!")
 
-        # Optional auto-delete warning
         warning_text = (
             "<b><u>❗️ IMPORTANT ❗️</u></b>\n\n"
             f"This message will be deleted in <b>{DELETE_AFTER // 60}</b> minutes 🫥.\n\n"
@@ -228,69 +229,58 @@ async def resend_file(c: Client, cb: CallbackQuery):
         )
         warning = await cb.message.reply(warning_text, parse_mode=enums.ParseMode.HTML)
 
-        await asyncio.sleep(DELETE_AFTER)
-        await sent.delete()
-        await warning.delete()
+        asyncio.create_task(_expire_pair(sent, warning, DELETE_AFTER))
 
     except Exception as e:
         print(f"[ERROR] Resend failed: {e}")
         await cb.answer("❌ Failed to resend.", show_alert=True)
 
 
+async def _expire_pair(sent, warning, delay):
+    try:
+        await asyncio.sleep(delay)
+        await sent.delete()
+        await warning.delete()
+    except Exception:
+        pass
+
 
 @client.on_callback_query(filters.regex(r"^page_(.+)_(\d+)$"))
 async def paginate_files(c: Client, cb: CallbackQuery):
     raw_query, page = cb.matches[0].group(1), int(cb.matches[0].group(2))
+    query = resolve_query_token(raw_query)
 
-    # ✅ Properly decode the query
-    query = urllib.parse.unquote(raw_query)
-
-    # Build regex search
-    keywords = re.split(r"\s+", query.strip())
-    regex_pattern = ".*".join(map(re.escape, keywords))
-    regex = re.compile(regex_pattern, re.IGNORECASE)
-
-    # Fetch results
+    regex = build_search_regex(query)
     results = list(files_collection.find({"file_name": {"$regex": regex}}))
     total_files = len(results)
     if total_files == 0:
         return await cb.answer("❌ No results found.", show_alert=True)
 
-    # ✅ Clamp page within valid range
     total_pages = math.ceil(total_files / PAGE_SIZE)
-    if page < 0:
-        page = 0
-    elif page >= total_pages:
-        page = total_pages - 1
+    page = max(0, min(page, total_pages - 1))
 
-    # Build new markup
     markup = get_file_buttons(results, query, page)
 
     try:
         await cb.message.edit_reply_markup(markup)
         await cb.answer()
+    except MessageNotModified:
+        await cb.answer()
     except Exception as e:
         print(f"❌ Pagination error: {e}")
         await cb.answer("⚠️ Couldn't load page.", show_alert=True)
 
-PAGE_SIZE=6
 
 @client.on_callback_query(filters.regex(r"^sendall_(.+)_(\d+)$"))
 async def send_all_files_callback(c: Client, q: CallbackQuery):
-    import urllib.parse
-
     raw = q.matches[0].group(1)
-    query = urllib.parse.unquote(raw)
+    query = resolve_query_token(raw)
     page = int(q.matches[0].group(2))
 
     await save_user(q.from_user.id)
 
-    # 🔎 Build regex like in search
-    keywords = re.split(r"\s+", query.strip())
-    pattern = ".*".join([re.escape(k) for k in keywords if k])
-    mongo_filter = {"file_name": {"$regex": pattern, "$options": "i"}}
-
-    files = list(files_collection.find(mongo_filter).sort("file_name", 1))
+    regex = build_search_regex(query)
+    files = list(files_collection.find({"file_name": {"$regex": regex}}).sort("file_name", 1))
     total_files = len(files)
     if total_files == 0:
         await q.answer("No files found for this search.", show_alert=True)
@@ -304,32 +294,24 @@ async def send_all_files_callback(c: Client, q: CallbackQuery):
         await q.answer("No files on this page.", show_alert=True)
         return
 
-    # 🔔 POPUP immediately when button clicked
-    await q.answer(
-        f"📤 Sending {len(current_files)} files to your DM...",
-        show_alert=True
-    )
+    await q.answer(f"📤 Sending {len(current_files)} files to your DM...", show_alert=True)
 
-    # ✅ Send each file
     for f in current_files:
         try:
             sent = await c.copy_message(
-                chat_id=q.from_user.id,
-                from_chat_id=INDEX_CHANNEL,
-                message_id=f["message_id"]
+                chat_id=q.from_user.id, from_chat_id=INDEX_CHANNEL, message_id=f["message_id"]
             )
             asyncio.create_task(delete_after_delay(sent, DELETE_AFTER_FILE))
             await asyncio.sleep(0.5)  # avoid FloodWait
         except Exception as e:
             print(f"Error sending file: {e}")
 
-    # ⚠️ Send ONE final important notice
     try:
         caption_msg = await c.send_message(
             q.from_user.id,
             (
                 f"<b><u>❗️❗️❗️ IMPORTANT ❗️❗️❗️</u></b>\n\n"
-                f"ᴛʜɪs ᴍᴇssᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪɴ <b><u>{DELETE_AFTER_FILE//60}</u> ᴍɪɴᴜᴛᴇs</b> 🫥 "
+                f"ᴛʜɪs ᴍᴇssᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪɴ <b><u>{DELETE_AFTER_FILE // 60}</u> ᴍɪɴᴜᴛᴇs</b> 🫥 "
                 "(ᴅᴜᴇ ᴛᴏ ᴄᴏᴘʏʀɪɢʜᴛ ɪssᴜᴇs).\n\n"
                 "<b>📌 Please forward this message to your Saved Messages or any private chat to avoid losing it.</b>"
             ),
@@ -338,9 +320,3 @@ async def send_all_files_callback(c: Client, q: CallbackQuery):
         asyncio.create_task(delete_after_delay(caption_msg, DELETE_AFTER_FILE))
     except Exception as e:
         print(f"Error sending caption: {e}")
-
-
-
-
-
-# TODO: Other callbacks (pagination, retry, resend_file, etc.) should be added here based on original bot.py

@@ -1,0 +1,275 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Sᴛᴏʀᴇᴅ Fɪʟᴇs : page {{ page }}{% if query %} (search: {{ query }}){% endif %}</title>
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  {% include '_common_head.html' %}
+  <style>
+    .top-row { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap }
+    .search-box { display:flex; gap:8px; align-items:center; flex:1 }
+    .search-field { flex:1; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.06);
+                    background:rgba(255,255,255,0.02); color:var(--text); min-width:180px }
+    .perpage { color:rgba(230,247,251,0.8); font-size:0.92rem; white-space:nowrap }
+    .card-file {
+      display:flex; flex-direction:row; gap:12px; align-items:center; justify-content:space-between;
+      padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.04);
+      background:rgba(255,255,255,0.02); transition:transform .2s ease, box-shadow .2s ease;
+    }
+    .card-file:hover {
+      transform:translateY(-4px);
+      box-shadow:0 6px 20px rgba(0,188,212,0.12);
+    }
+    .meta { flex:1; text-align:left }
+    .file-name { font-weight:600; color:var(--text); word-break:break-word; font-size:1rem }
+    .file-size { font-size:0.9rem; color:rgba(230,247,251,0.7); margin-left:8px; white-space:nowrap }
+    .actions { display:flex; gap:8px; align-items:center; flex-shrink:0 }
+    .page-btn { padding:10px 16px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
+                background:linear-gradient(90deg,var(--accent),var(--primary)); color:#032; font-weight:600;
+                box-shadow:0 4px 18px rgba(0,188,212,0.15); transition:transform .18s ease; }
+    .page-btn:hover { transform:translateY(-2px) }
+    .page-btn[disabled]{ opacity:0.35; cursor:not-allowed }
+    .pagination { display:flex; gap:8px; justify-content:center; margin-top:22px; align-items:center; flex-wrap:wrap }
+    .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)) }
+    .ad-container { display:flex; justify-content:center; align-items:center; margin:25px 0; text-align:center; }
+
+    /* Popup Ad Styles */
+    #popupAd {
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;
+      animation: fadeIn 0.3s ease forwards;
+    }
+    #popupAd .ad-box {
+      position:relative; background:#fff; padding:10px; border-radius:12px;
+      box-shadow:0 0 15px rgba(0,0,0,0.3);
+      transform:scale(0.8); opacity:0;
+      animation: zoomIn 0.4s ease forwards;
+    }
+    @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+    @keyframes zoomIn { to{transform:scale(1); opacity:1;} }
+    #closeAd {
+      position:absolute; top:-23px;font-size:20px; right:8px; background:#fff; color:black;
+      border:none; border-radius:3px; cursor:pointer; padding:2px 6px;
+    }
+
+    /* Responsive tweaks */
+    @media(max-width:600px){
+      .card-file { flex-direction:column; align-items:flex-start; }
+      .file-size { margin-left:0; display:block; margin-top:4px; }
+      .actions { width:100%; justify-content:flex-end; }
+      .page-btn { width:100%; text-align:center; }
+      .search-box { width:100%; }
+      .search-field { width:100%; }
+      .ad-container { margin:16px 0; }
+    }
+  </style>
+
+</head>
+<body>
+  <div class="page-bg"></div>
+  <div class="container" role="main">
+    <div style="display:flex;align-items:center;gap:18px; margin-bottom:18px; flex-wrap:wrap">
+      <a href="{{ url_for('home') }}">
+        <img src="/static/logo.png" alt="logo" style="width:64px; cursor:pointer; filter:drop-shadow(0 0 10px rgba(0,188,212,0.55))">
+      </a>
+
+      <div>
+        <div style="font-size:1.1rem; color:var(--primary); font-weight:600">Sᴛᴏʀᴇᴅ Fɪʟᴇs</div>
+        <div class="small">Bʀᴏᴡsᴇ sᴛᴏʀᴇᴅ ғɪʟᴇs (Pᴀɢᴇ {{ page }} ᴏғ {{ total_pages }})</div>
+      </div>
+      <div style="margin-left:auto">
+        {% if page > 1 %}
+          <a class="glow-btn" href="{{ url_for('files_list') }}?page={{ page-1 }}{% if query %}&search={{ query | urlencode }}{% endif %}">← Bᴀᴄᴋ</a>
+        {% else %}
+          <a class="glow-btn" href="{{ url_for('home') }}">← Bᴀᴄᴋ</a>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- Top Ad -->
+    <div class="ad-container">
+      <script type="text/javascript">
+        atOptions = {
+          'key' : 'bf07742ac8514ce05bb75cd85a9bcd6e',
+          'format' : 'iframe',
+          'height' : 50,
+          'width' : 320,
+          'params' : {}
+        };
+      </script>
+      <script type="text/javascript" src="//www.highperformanceformat.com/bf07742ac8514ce05bb75cd85a9bcd6e/invoke.js"></script>
+    </div>
+
+    <div class="card">
+      <div class="top-row">
+        <form id="searchForm" method="get" action="{{ url_for('files_list') }}" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; width:100%">
+          <div class="search-box">
+            <input class="search-field" name="search" placeholder="Sᴇᴀʀᴄʜ ғɪʟᴇ ɴᴀᴍᴇs..." value="{{ query | e }}">
+            <button class="page-btn" type="submit">Sᴇᴀʀᴄʜ</button>
+          </div>
+          <div class="perpage">Sʜᴏᴡɪɴɢ {{ per_page }} ᴘᴇʀ ᴘᴀɢᴇ</div>
+        </form>
+      </div>
+
+      <div class="grid">
+        {% if files %}
+          {% for f in files %}
+            <div class="card-file">
+              <div class="meta">
+                <div class="file-name">
+                  {{ f.get('file_name', 'Unnamed File') }}
+                  {% if f.get('file_size') %}
+                    {% set size = f.get('file_size')|int %}
+                    {% if size < 1024 %}
+                      <span class="file-size">({{ size }} B)</span>
+                    {% elif size < 1048576 %}
+                      <span class="file-size">({{ '%.1f' % (size / 1024) }} KB)</span>
+                    {% elif size < 1073741824 %}
+                      <span class="file-size">({{ '%.1f' % (size / 1048576) }} MB)</span>
+                    {% else %}
+                      <span class="file-size">({{ '%.2f' % (size / 1073741824) }} GB)</span>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </div>
+              <div class="actions">
+                <a class="page-btn" href="{{ url_for('redirect_page') }}?id={{ f.get('message_id') }}">Gᴇᴛ</a>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="small" style="padding:20px">No files found.</div>
+        {% endif %}
+      </div>
+
+      <div class="pagination">
+        {% if page > 1 %}
+          <a class="page-btn" href="{{ url_for('files_list') }}?page={{ page-1 }}{% if query %}&search={{ query | urlencode }}{% endif %}">Pʀᴇᴠɪᴏᴜs</a>
+        {% else %}
+          <button class="page-btn" disabled>Pʀᴇᴠɪᴏᴜs</button>
+        {% endif %}
+
+        <div class="small">Pᴀɢᴇ {{ page }} / {{ total_pages }}</div>
+
+        {% if page < total_pages %}
+          <a class="page-btn" id="nextBtn" href="{{ url_for('files_list') }}?page={{ page+1 }}{% if query %}&search={{ query | urlencode }}{% endif %}">Nᴇxᴛ</a>
+        {% else %}
+          <button class="page-btn" disabled>Nᴇxᴛ</button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Bottom Ad -->
+    <div class="ad-container">
+      <script type="text/javascript">
+        atOptions = {
+          'key' : 'bf07742ac8514ce05bb75cd85a9bcd6e',
+          'format' : 'iframe',
+          'height' : 50,
+          'width' : 320,
+          'params' : {}
+        };
+      </script>
+      <script type="text/javascript" src="//www.highperformanceformat.com/bf07742ac8514ce05bb75cd85a9bcd6e/invoke.js"></script>
+    </div>
+
+    <!-- Popup Ad -->
+    <div id="popupAd">
+      <div class="ad-box">
+        <button id="closeAd">Close</button>
+        <script type="text/javascript">
+          atOptions = {
+            'key' : 'fdf3bc4ff7c8fb37b011cb27d58ecc67',
+            'format' : 'iframe',
+            'height' : 250,
+            'width' : 300,
+            'params' : {}
+          };
+        </script>
+        <script type="text/javascript" src="//www.highperformanceformat.com/fdf3bc4ff7c8fb37b011cb27d58ecc67/invoke.js"></script>
+      </div>
+    </div>
+
+    <script>
+    const nextBtn = document.getElementById('nextBtn');
+    const popupAd = document.getElementById('popupAd');
+    const closeAd = document.getElementById('closeAd');
+    const searchForm = document.getElementById('searchForm');
+
+    // Show popup every 3 pages
+    if (nextBtn) {
+      nextBtn.addEventListener('click', function(event) {
+        event.preventDefault();
+        let adCount = parseInt(localStorage.getItem('adCount') || '0');
+        adCount++;
+        if (adCount >= 3) {
+          popupAd.style.display = 'flex';
+          localStorage.setItem('adCount', 0);
+          closeAd.onclick = () => {
+            popupAd.style.display = 'none';
+            window.location.href = nextBtn.href;
+          };
+        } else {
+          localStorage.setItem('adCount', adCount);
+          window.location.href = nextBtn.href;
+        }
+      });
+    }
+
+    // Show popup after search submit
+    if (searchForm) {
+      searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        popupAd.style.display = 'flex';
+        closeAd.onclick = () => {
+          popupAd.style.display = 'none';
+          searchForm.submit();
+        };
+      });
+    }
+    </script>
+  
+  </div>
+
+  <!-- Footer -->
+<footer class="site-footer">
+  <div class="footer-content">
+    © 2025 IAmBatman. All Rights Reserved.
+  </div>
+</footer>
+
+<style>
+.site-footer {
+  width: 100%;
+  padding: 14px 0;
+  background: rgba(0, 0, 0, 0.25);
+  text-align: center;
+  color: rgba(230, 247, 251, 0.7);
+  font-size: 0.88rem;
+  position: relative;
+  bottom: 0;
+  margin-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+}
+.site-footer .footer-content {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.site-footer a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+}
+@media(max-width:600px){
+  .site-footer { font-size: 0.82rem; padding: 12px 8px; }
+}
+</style>
+
+</body>
+</html>

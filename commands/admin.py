@@ -1,38 +1,58 @@
+"""
+Admin-only commands.
+
+NOTE: These used to be defined in BOTH commands/admin.py and handlers/messages.py
+with identical names/filters. Pyrogram only ever invoked the first-registered
+copy (silently making the other a dead duplicate) — this file is now the single
+source of truth for every admin command, and messages.py no longer redefines them.
+"""
 import asyncio
 import re
 from pyrogram import Client, filters, enums
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import Message
+from pyrogram.errors import FloodWait
 from config import client, ADMIN_ID, users_collection, files_collection, INDEX_CHANNEL, BASE_URL
-from utils.helpers import save_user,get_file_buttons,build_index_page,send_paginated_files
+from utils.helpers import send_paginated_files, build_search_regex, file_open_link
+
 
 # ------------------ /status ------------------ #
 @client.on_message(filters.command("status") & filters.user(ADMIN_ID))
 async def status(_, m: Message):
     total = users_collection.count_documents({})
     deleted = 0
-    blocked = 0
+    unreachable = 0
+    checked = 0
 
     msg = await m.reply("⏳ Checking user status...")
 
-    users = users_collection.find()
-    for user in users:
+    for user in users_collection.find({}, {"user_id": 1}):
+        checked += 1
         try:
-            await client.get_users(user["user_id"])
-        except Exception as e:
-            if "deleted account" in str(e).lower():
+            u = await client.get_users(user["user_id"])
+            # Telegram returns deleted accounts normally (flagged), it does not raise.
+            if getattr(u, "is_deleted", False):
                 deleted += 1
-            elif "USER_IS_BLOCKED" in str(e):
-                blocked += 1
-        await asyncio.sleep(0.05)  # avoid floodwait
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+        except Exception:
+            unreachable += 1
+        await asyncio.sleep(0.05)
 
-    active = total - deleted - blocked
+        if checked % 200 == 0:
+            try:
+                await msg.edit_text(f"⏳ Checking user status... ({checked}/{total})")
+            except Exception:
+                pass
+
+    active = total - deleted - unreachable
 
     await msg.edit_text(
         f"📊 <b>Bot Status:</b>\n\n"
         f"👥 Total Users: <code>{total}</code>\n"
         f"✅ Active Users: <code>{active}</code>\n"
-        f"🚫 Blocked Users: <code>{blocked}</code>\n"
-        f"🗑 Deleted Accounts: <code>{deleted}</code>",
+        f"🗑 Deleted Accounts: <code>{deleted}</code>\n"
+        f"❓ Unreachable: <code>{unreachable}</code>\n"
+        f"📁 Indexed Files: <code>{files_collection.count_documents({})}</code>",
         parse_mode=enums.ParseMode.HTML
     )
 
@@ -51,25 +71,19 @@ async def send_file_paginated(c: Client, m: Message):
         user_id = int(parts[1])
         filename_query = parts[2].strip()
 
-        # Optional: Get user info for confirmation
         try:
             user = await c.get_users(user_id)
         except Exception:
             user = None
 
-        # Regex search for matching files
-        keywords = re.split(r"\s+", filename_query)
-        regex_pattern = ".*".join(map(re.escape, keywords))
-        regex = re.compile(regex_pattern, re.IGNORECASE)
+        regex = build_search_regex(filename_query)
         matching_files = list(files_collection.find({"file_name": {"$regex": regex}}))
 
         if not matching_files:
             return await m.reply("❌ No files found matching your query.")
 
-        # Send paginated files
         await send_paginated_files(c, user_id, matching_files, 0, filename_query)
 
-        # Confirmation
         if user:
             name = f"{user.first_name or ''} {user.last_name or ''}".strip()
             await m.reply(f"✅ Sent to <a href='tg://user?id={user_id}'>{name}</a>", parse_mode=enums.ParseMode.HTML)
@@ -87,26 +101,34 @@ async def broadcast(_, m: Message):
         return await m.reply("❗ Reply to a message to broadcast.")
 
     sent, failed = 0, 0
-    users = users_collection.find()
+    status_msg = await m.reply("📣 Starting broadcast...")
 
-    for user in users:
+    total = users_collection.count_documents({})
+    for i, user in enumerate(users_collection.find({}, {"user_id": 1}), start=1):
         try:
             sent_msg = await m.reply_to_message.copy(user["user_id"])
             sent += 1
-            asyncio.create_task(auto_delete(sent_msg, delay=172800))
-        except:
+            asyncio.create_task(_auto_delete(sent_msg, delay=172800))
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+        except Exception:
             failed += 1
         await asyncio.sleep(0.1)
 
-    await m.reply(f"✅ Broadcast done.\n✔️ Sent: {sent}\n❌ Failed: {failed}")
+        if i % 100 == 0:
+            try:
+                await status_msg.edit_text(f"📣 Broadcasting... {i}/{total} (sent {sent}, failed {failed})")
+            except Exception:
+                pass
+
+    await status_msg.edit_text(f"✅ Broadcast done.\n✔️ Sent: {sent}\n❌ Failed: {failed}")
 
 
-# ------------------ Auto Delete ------------------ #
-async def auto_delete(message: Message, delay: int = 10):
+async def _auto_delete(message: Message, delay: int = 10):
     await asyncio.sleep(delay)
     try:
         await message.delete()
-    except:
+    except Exception:
         pass
 
 
@@ -122,12 +144,46 @@ async def link_handler(c: Client, m: Message):
     except Exception as e:
         return await m.reply(f"❌ Failed to copy message: {e}")
 
-    file_name = reply.text or getattr(reply, "caption", None) or "Unnamed"
-    files_collection.insert_one({
-        "file_name": file_name,
-        "message_id": fwd_msg.id,
-        "type": "generic"
-    })
+    media = reply.document or reply.video or reply.audio
+    file_name = (
+        getattr(media, "file_name", None)
+        or reply.caption
+        or reply.text
+        or "Unnamed"
+    )
+    file_size = getattr(media, "file_size", None)
+    files_collection.update_one(
+        {"message_id": fwd_msg.id},
+        {"$set": {
+            "file_name": str(file_name),
+            "file_size": file_size,
+            "message_id": fwd_msg.id,
+            "type": "generic",
+        }},
+        upsert=True,
+    )
 
-    redirect_link = f"{BASE_URL}/redirect?id={fwd_msg.id}"
+    redirect_link = file_open_link(fwd_msg.id)
     await m.reply(f"✅ File indexed!\n\n<code>{redirect_link}</code>", parse_mode=enums.ParseMode.HTML)
+
+
+# ------------------ /uploadsession & /showsession ------------------ #
+@client.on_message(filters.command("uploadsession") & filters.user(ADMIN_ID))
+async def upload_session_handler(c, m):
+    from config import save_session_to_db
+    await m.reply("🔄 Exporting session and saving to DB... Please wait.", quote=True)
+    ok = await save_session_to_db()
+    if ok:
+        await m.reply("✅ Session saved to MongoDB.", quote=True)
+    else:
+        await m.reply("❌ Failed to save session. Check logs.", quote=True)
+
+
+@client.on_message(filters.command("showsession") & filters.user(ADMIN_ID))
+async def showsession(c, m):
+    from config import load_session_from_db
+    s = load_session_from_db()
+    if s:
+        await m.reply("✅ Session exists in DB.", quote=True)
+    else:
+        await m.reply("❌ No session stored in DB yet.", quote=True)

@@ -1,0 +1,132 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Iᴀᴍ Bᴀᴛᴍᴀɴ</title>
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <!--
+    Telegram Mini App SDK. This MUST load before any other script that
+    touches window.Telegram.WebApp, and this page previously had no
+    reference to it at all — that's why tapping a search result opened the
+    Mini App but always landed on this plain home page: nothing here ever
+    read the `startapp` parameter Telegram passed in.
+  -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      try {
+        if (!(window.Telegram && window.Telegram.WebApp)) return;
+        var tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        var startParam = tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+        if (startParam && startParam.indexOf('file_') === 0) {
+          var fileId = startParam.slice('file_'.length);
+
+          // Hide the homepage in case there's any brief flash before the
+          // navigation below completes.
+          document.documentElement.setAttribute('data-miniapp-redirecting', 'true');
+
+          // Hand off to the existing /redirect page instead of rebuilding
+          // its flow here: it already shows the file name, runs the
+          // AdsGalaxy ad, and has a real tap-triggered "Get File" button
+          // that opens the bot — a plain same-origin navigation, so none of
+          // the "Telegram link needs a genuine user gesture" restrictions
+          // that broke the previous auto-openTelegramLink() attempt apply.
+          window.location.replace('/redirect?id=' + encodeURIComponent(fileId));
+        }
+      } catch (e) {
+        console.error('Telegram WebApp init error:', e);
+      }
+    })();
+  </script>
+  {% include '_common_head.html' %}
+  <style>
+    /* PUBG-like cinematic fade for the logo */
+    .logo { width:200px; height:auto; opacity:0; transform:scale(1.18);
+           filter: drop-shadow(0 0 14px rgba(0,188,212,0.55)) drop-shadow(0 0 30px rgba(30,144,255,0.45));
+           animation: pubgFade 3.6s cubic-bezier(.2,.9,.2,1) forwards; }
+    @keyframes pubgFade {
+      0%   { opacity:0; transform:scale(1.4); filter:blur(10px); }
+      55%  { opacity:1; transform:scale(1.03); filter:blur(2px); }
+      100% { opacity:1; transform:scale(1); filter:blur(0); }
+    }
+    .title { font-size:1.6rem; margin-top:20px; color:var(--primary); opacity:0; transform:translateY(8px);
+            animation: fadeUp .9s 3.8s forwards; }
+    .subtitle { margin-top:10px; color:rgba(230,247,251,0.82); max-width:720px; opacity:0; transform:translateY(8px);
+               animation: fadeUp .9s 4.0s forwards; }
+    .home-actions{display:flex; gap:12px; margin-top:26px; opacity:0; transform:translateY(8px); animation:fadeUp .9s 4.2s forwards}
+    @keyframes fadeUp{ to {opacity:1; transform:none} }
+    .link-outline { padding:10px 18px; border-radius:10px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:var(--text) }
+
+    /* Shown briefly while we hand off a file_<id> deep link back to the bot;
+       hides the normal homepage so it doesn't flash before the redirect. */
+    #miniapp-redirect-overlay { display:none; }
+    html[data-miniapp-redirecting="true"] #miniapp-redirect-overlay { display:flex; }
+    html[data-miniapp-redirecting="true"] #home-main-content { display:none; }
+  </style>
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <div id="miniapp-redirect-overlay" class="center-full container" role="status" aria-live="polite"
+       style="flex-direction:column; align-items:center; justify-content:center; gap:10px;">
+    <div class="title" style="opacity:1; animation:none;">📥 Opening your file…</div>
+  </div>
+
+  <div id="home-main-content" class="center-full container" role="main" aria-labelledby="home-title">
+    <img src="/static/logo.png" alt="Logo" class="logo" />
+    <div id="home-title" class="title">Wᴇʟᴄᴏᴍᴇ ᴛᴏ Bᴀᴛᴍᴀɴ's Fɪʟᴇs Sᴛᴏʀᴀɢᴇ</div>
+    <div class="subtitle small">Aᴄᴄᴇss sᴛᴏʀᴇᴅ ғɪʟᴇs ɪɴsᴛᴀɴᴛʟʏ ᴠɪᴀ Tᴇʟᴇɢʀᴀᴍ. Bʀᴏᴡsᴇ, sᴇᴀʀᴄʜ, ᴀɴᴅ ᴅᴏᴡɴʟᴏᴀᴅ ғɪʟᴇs ᴇғғᴏʀᴛʟᴇssʟʏ.</div>
+
+    <div class="home-actions">
+      <button class="glow-btn" onclick="location.href='{{ url_for('files_list') }}'">📁 Vɪᴇᴡ Sᴛᴏʀᴇᴅ Fɪʟᴇs</button>
+      <a class="glow-btn"
+   href="https://bat-stream.blogspot.com"
+   onclick="window.open('https://bat-stream.blogspot.com', '_system'); return false;">
+  🎬 Sᴛʀᴇᴀᴍɪɴɢ Wᴇʙsɪᴛᴇ
+</a>
+  </div>
+
+  <!-- Footer -->
+<footer class="site-footer">
+  <div class="footer-content">
+    © 2025 IAmBatman. All Rights Reserved.
+  </div>
+</footer>
+
+<style>
+.site-footer {
+  width: 100%;
+  padding: 14px 0;
+  background: rgba(0, 0, 0, 0.25);
+  text-align: center;
+  color: rgba(230, 247, 251, 0.7);
+  font-size: 0.88rem;
+  position: relative;
+  bottom: 0;
+  margin-top: 220px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+}
+.site-footer .footer-content {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.site-footer a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+}
+@media(max-width:600px){
+  .site-footer { font-size: 0.82rem; padding: 12px 8px; margin-top: 350px; }
+}
+</style>
+
+</body>
+</html>
