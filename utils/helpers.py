@@ -256,8 +256,14 @@ def fetch_index_page(query: str, page: int):
     total_pages = max(1, math.ceil(total / INDEX_PAGE_SIZE))
     page = max(0, min(page, total_pages - 1))
     docs = list(
-        files_collection.find(flt).sort("file_name", 1).skip(page * INDEX_PAGE_SIZE).limit(INDEX_PAGE_SIZE)
-    )
+            files_collection.find(flt)
+            .sort([
+                ("file_name", 1),
+                ("_id", 1),
+            ])
+            .skip(page * INDEX_PAGE_SIZE)
+            .limit(INDEX_PAGE_SIZE)
+        )
     return build_index_page(docs, page, total_pages, total, query)
 
 
