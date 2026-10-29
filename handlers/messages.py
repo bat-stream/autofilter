@@ -87,7 +87,11 @@ async def start(c: Client, m: Message):
     ):
         query = args[1].replace("search_", "", 1).replace("_", " ").strip()
         regex = build_search_regex(query)
-        results = list(files_collection.find({"file_name": {"$regex": regex}}))
+        results = list(
+            files_collection.find(
+                {"file_name": {"$regex": regex}}
+            ).sort("message_id", -1)
+        )
 
         if not results:
             msg = await m.reply(
@@ -156,7 +160,11 @@ async def search(c: Client, m: Message):
         return
 
     regex = build_search_regex(query)
-    results = list(files_collection.find({"file_name": {"$regex": regex}}))
+    results = list(
+            files_collection.find(
+                {"file_name": {"$regex": regex}}
+            ).sort("message_id", -1)
+        )
 
     if not results:
         if m.chat.type == enums.ChatType.PRIVATE:
